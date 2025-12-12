@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-type ProcessType = 'facturas' | 'liquidaciones';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca';
 
 export default function Home() {
   const [selectedType, setSelectedType] = useState<ProcessType | null>(null);
@@ -26,13 +26,18 @@ export default function Home() {
     setIsDragging(false);
 
     const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (file) => file.type === 'application/pdf'
+      (file) => {
+        if (selectedType === 'arca') {
+          return file.name.endsWith('.csv') || file.type === 'text/csv';
+        }
+        return file.type === 'application/pdf';
+      }
     );
 
     if (droppedFiles.length > 0) {
       setFiles((prev) => [...prev, ...droppedFiles]);
     }
-  }, []);
+  }, [selectedType]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -56,8 +61,12 @@ export default function Home() {
       formData.append('files', file);
     });
 
-    const apiEndpoint = selectedType === 'facturas' ? '/api/process-pdfs' : '/api/process-liquidations';
-    const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' : 'liquidaciones_tarjetas.xlsx';
+    const apiEndpoint = selectedType === 'facturas' ? '/api/process-pdfs' :
+                        selectedType === 'liquidaciones' ? '/api/process-liquidations' :
+                        '/api/process-arca';
+    const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
+                             selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
+                             'comprobantes_arca_consolidados.xlsx';
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -128,7 +137,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -202,12 +211,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('arca')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-green-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Bot ARCA
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Consolida CSVs descargados de AFIP
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Comprobantes emitidos</p>
+                  <p>✓ Comprobantes recibidos</p>
+                  <p>✓ Consolidación automática</p>
+                  <p>✓ Múltiples contribuyentes</p>
+                  <p>✓ Formato estandarizado</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : 'bg-gradient-to-br from-purple-400 to-purple-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -221,18 +267,25 @@ export default function Home() {
                         strokeWidth={2}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
-                    ) : (
+                    ) : selectedType === 'liquidaciones' ? (
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
                         d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                       />
+                    ) : (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     )}
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : 'Liquidaciones de Tarjetas'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -257,7 +310,7 @@ export default function Home() {
                   id="fileInput"
                   type="file"
                   multiple
-                  accept=".pdf"
+                  accept={selectedType === 'arca' ? '.csv' : '.pdf'}
                   onChange={handleFileInput}
                   className="hidden"
                 />
@@ -280,7 +333,7 @@ export default function Home() {
                   </div>
 
                   <h3 className="text-2xl font-semibold mb-2">
-                    Arrastra tus archivos PDF aquí
+                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : 'PDF'} aquí
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-4">
                     o haz clic para seleccionarlos
