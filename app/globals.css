@@ -65,3 +65,12 @@ body {
   border-color: #6366f1;
   transform: scale(1.02);
 }
+
+/* Animation delays for blob effects */
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
