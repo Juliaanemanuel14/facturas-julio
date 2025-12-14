@@ -46,3 +46,7 @@ ENV/
 # project specific
 Facturas/
 *.xlsx
+
+# credentials and secrets
+PROYECTO AZURE/.env
+PROYECTO AZURE/credentials/

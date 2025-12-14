@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores';
 
 export default function Home() {
   const [selectedType, setSelectedType] = useState<ProcessType | null>(null);
@@ -10,6 +10,8 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const [processedData, setProcessedData] = useState<any>(null);
+  const [showResults, setShowResults] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -29,6 +31,9 @@ export default function Home() {
       (file) => {
         if (selectedType === 'arca') {
           return file.name.endsWith('.csv') || file.type === 'text/csv';
+        }
+        if (selectedType === 'proveedores') {
+          return file.type === 'application/pdf' || file.type.startsWith('image/');
         }
         return file.type === 'application/pdf';
       }
@@ -55,12 +60,40 @@ export default function Home() {
 
     setIsProcessing(true);
     setProcessedCount(0);
+    setShowResults(false);
+    setProcessedData(null);
 
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('files', file);
     });
 
+    // Para proveedores, usar el endpoint de análisis que devuelve JSON
+    if (selectedType === 'proveedores') {
+      try {
+        const response = await fetch('/api/analyze-proveedores', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Error processing files');
+        }
+
+        const data = await response.json();
+        setProcessedData(data);
+        setShowResults(true);
+        setProcessedCount(data.totalFiles);
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Hubo un error al procesar los archivos. Por favor, intenta nuevamente.');
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+    // Para otros tipos, mantener el flujo original (descarga directa)
     const apiEndpoint = selectedType === 'facturas' ? '/api/process-pdfs' :
                         selectedType === 'liquidaciones' ? '/api/process-liquidations' :
                         '/api/process-arca';
@@ -101,10 +134,51 @@ export default function Home() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!processedData) return;
+
+    setIsProcessing(true);
+
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    try {
+      const response = await fetch('/api/process-proveedores', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Error generating Excel');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'facturas_proveedores.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      alert('Excel generado exitosamente');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Hubo un error al generar el Excel. Por favor, intenta nuevamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const resetSelection = () => {
     setSelectedType(null);
     setFiles([]);
     setProcessedCount(0);
+    setProcessedData(null);
+    setShowResults(false);
   };
 
   return (
@@ -137,7 +211,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -248,12 +322,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('proveedores')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-orange-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-amber-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Desglose Facturas Proveedores
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Extrae datos de facturas con IA (Azure + Gemini)
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Coca-Cola FEMSA (18 campos)</p>
+                  <p>✓ Quilmes (21 campos)</p>
+                  <p>✓ Extractor general (Azure)</p>
+                  <p>✓ Normalización de productos</p>
+                  <p>✓ Soporta PDF e imágenes</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -285,7 +396,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -310,7 +421,7 @@ export default function Home() {
                   id="fileInput"
                   type="file"
                   multiple
-                  accept={selectedType === 'arca' ? '.csv' : '.pdf'}
+                  accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : '.pdf'}
                   onChange={handleFileInput}
                   className="hidden"
                 />
@@ -333,7 +444,7 @@ export default function Home() {
                   </div>
 
                   <h3 className="text-2xl font-semibold mb-2">
-                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : 'PDF'} aquí
+                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : 'PDF'} aquí
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-4">
                     o haz clic para seleccionarlos
@@ -454,14 +565,140 @@ export default function Home() {
                           d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      Generar Excel
+                      {selectedType === 'proveedores' ? 'Procesar Facturas' : 'Generar Excel'}
                     </>
                   )}
                 </button>
               </div>
             )}
 
-            {processedCount > 0 && (
+            {showResults && processedData && selectedType === 'proveedores' && (
+              <div className="mt-8 space-y-6">
+                <div className="p-6 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-2xl font-bold text-green-700 dark:text-green-400">
+                        ¡Procesamiento completado!
+                      </h3>
+                      <p className="text-green-600 dark:text-green-300 mt-1">
+                        {processedData.totalFiles} archivo{processedData.totalFiles > 1 ? 's' : ''} procesado{processedData.totalFiles > 1 ? 's' : ''} • {processedData.totalItems} items extraídos
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleExportExcel}
+                      disabled={isProcessing}
+                      className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Exportar a Excel
+                    </button>
+                  </div>
+                </div>
+
+                {processedData.invoices && processedData.invoices.map((invoice: any, idx: number) => (
+                  <div key={idx} className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+                    <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-700 dark:to-slate-600">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+                            {invoice.fileName}
+                          </h4>
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              invoice.provider === 'cocacola' ? 'bg-red-100 text-red-700' :
+                              invoice.provider === 'quilmes' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {invoice.provider.toUpperCase()}
+                            </span>
+                            {invoice.invoiceNumber && (
+                              <span className="text-gray-600 dark:text-gray-300">
+                                Nro: {invoice.invoiceNumber}
+                              </span>
+                            )}
+                            {invoice.invoiceTotal && (
+                              <span className="text-gray-600 dark:text-gray-300 font-semibold">
+                                Total: ${invoice.invoiceTotal.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-blue-600">
+                            {invoice.items.length}
+                          </p>
+                          <p className="text-sm text-gray-500">items</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {invoice.error ? (
+                      <div className="p-6 bg-red-50 dark:bg-red-900/20">
+                        <p className="text-red-600 dark:text-red-400">Error: {invoice.error}</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 dark:bg-slate-700">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Código</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Descripción</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Cant.</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">P.Unit</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Subtotal</th>
+                              {invoice.provider === 'cocacola' && (
+                                <>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Desc</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Neto</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Imp.Int</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">IVA 21%</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">IIBB CABA</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">IIBB 3337</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap bg-green-100 dark:bg-green-900">Total Final</th>
+                                  <th className="px-3 py-2 text-right font-semibold whitespace-nowrap bg-blue-100 dark:bg-blue-900">Costo/Bulto</th>
+                                </>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                            {invoice.items.slice(0, 10).map((item: any, itemIdx: number) => (
+                              <tr key={itemIdx} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                                <td className="px-3 py-2 whitespace-nowrap">{item.Codigo || '-'}</td>
+                                <td className="px-3 py-2 max-w-xs truncate" title={item.Descripcion}>{item.Descripcion || '-'}</td>
+                                <td className="px-3 py-2 text-right whitespace-nowrap">{item.Cantidad || '-'}</td>
+                                <td className="px-3 py-2 text-right whitespace-nowrap">{item.PrecioUnitario ? `$${item.PrecioUnitario.toLocaleString()}` : '-'}</td>
+                                <td className="px-3 py-2 text-right font-semibold whitespace-nowrap">{item.Subtotal ? `$${item.Subtotal.toLocaleString()}` : '-'}</td>
+                                {invoice.provider === 'cocacola' && (
+                                  <>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.desc ? `$${item.desc.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.neto ? `$${item.neto.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.imp_int ? `$${item.imp_int.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.iva_21 ? `$${item.iva_21.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.iibb_caba ? `$${item.iibb_caba.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">{item.iibb_reg_3337 ? `$${item.iibb_reg_3337.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-green-600 whitespace-nowrap bg-green-50 dark:bg-green-900/20">{item.total_final ? `$${item.total_final.toLocaleString()}` : '-'}</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-blue-600 whitespace-nowrap bg-blue-50 dark:bg-blue-900/20">{item.costo_x_bulto ? `$${item.costo_x_bulto.toLocaleString()}` : '-'}</td>
+                                  </>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {invoice.items.length > 10 && (
+                          <div className="p-4 bg-gray-50 dark:bg-slate-700 text-center text-sm text-gray-500">
+                            Mostrando 10 de {invoice.items.length} items. Descarga el Excel para ver todos.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {processedCount > 0 && selectedType !== 'proveedores' && (
               <div className="mt-8 p-6 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-xl text-center">
                 <svg
                   className="w-16 h-16 text-green-500 mx-auto mb-4"
