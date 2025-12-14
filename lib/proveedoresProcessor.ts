@@ -68,7 +68,7 @@ async function extractItemsWithAzure(buffer: Buffer): Promise<InvoiceItem[]> {
 
   if (result.documents) {
     for (const doc of result.documents) {
-      const itemsField = doc.fields?.Items;
+      const itemsField = doc.fields?.Items as any;
 
       if (itemsField && itemsField.values) {
         for (const it of itemsField.values) {
