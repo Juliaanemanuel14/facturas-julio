@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { processProveedorInvoice } from '@/lib/proveedoresProcessor';
+import { PROVIDER_TYPES } from '@/lib/proveedoresConfig';
 
 export const config = {
   api: {
@@ -63,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error(`Error processing file ${file.originalFilename}:`, fileError);
         results.push({
           fileName: file.originalFilename || 'unknown',
-          provider: 'general',
+          provider: PROVIDER_TYPES.GENERAL,
           items: [],
           error: fileError instanceof Error ? fileError.message : 'Unknown error',
         });
