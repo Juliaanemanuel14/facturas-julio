@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj';
 
 export default function Home() {
   const router = useRouter();
@@ -107,9 +107,11 @@ export default function Home() {
     // Para otros tipos, mantener el flujo original (descarga directa)
     const apiEndpoint = selectedType === 'facturas' ? '/api/process-pdfs' :
                         selectedType === 'liquidaciones' ? '/api/process-liquidations' :
+                        selectedType === 'ddjj' ? '/api/process-ddjj' :
                         '/api/process-arca';
     const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
                              selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
+                             selectedType === 'ddjj' ? 'ddjj_iva.xlsx' :
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
@@ -235,7 +237,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -383,12 +385,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('ddjj')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-pink-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-rose-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Extractor Declaración Jurada
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Extrae datos de DDJJ IVA AFIP
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ CUIT y Razón Social</p>
+                  <p>✓ Débito y Crédito Fiscal</p>
+                  <p>✓ Saldos técnicos</p>
+                  <p>✓ Retenciones y percepciones</p>
+                  <p>✓ Exporta a Excel</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -420,7 +459,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -468,7 +507,7 @@ export default function Home() {
                   </div>
 
                   <h3 className="text-2xl font-semibold mb-2">
-                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : 'PDF'} aquí
+                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : 'PDF'} aquí
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-4">
                     o haz clic para seleccionarlos
