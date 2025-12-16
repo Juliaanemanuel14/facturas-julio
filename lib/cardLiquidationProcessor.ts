@@ -136,40 +136,54 @@ export async function processCardLiquidation(buffer: Buffer, filename: string): 
 
   liquidationData.Establecimiento = extractValueBelow('Establecimiento', text, 1);
 
-  // Valores monetarios con regex mejorados para capturar formatos variados
-  // Intentar primero con el formato estándar "TOTAL PRESENTADO $"
+  // Valores monetarios con múltiples intentos de regex
+  // TOTAL PRESENTADO - intentar varios formatos
   liquidationData.Total_Presentado = extractMonetaryValue(
     /TOTAL\s+PRESENTADO\s+\$\s*([\d.,]+)/i,
     text
   );
-  // Si no encuentra, intentar sin el signo $
   if (liquidationData.Total_Presentado === '0.00') {
     liquidationData.Total_Presentado = extractMonetaryValue(
-      /TOTAL\s+PRESENTADO\s+([\d.,]+)/i,
+      /TOTAL\s+PRESENTADO\s+\$?\s*TOTAL[^\d]*([\d.,]+)/i,
       text
     );
   }
+  if (liquidationData.Total_Presentado === '0.00') {
+    // Buscar después de "TOTAL PRESENTADO $" en la misma línea o siguiente
+    const match = text.match(/TOTAL\s+PRESENTADO\s+\$[^\d\n]*([\d.,]+)/i);
+    if (match) liquidationData.Total_Presentado = normalizeNumber(match[1]);
+  }
 
+  // TOTAL DESCUENTO - intentar varios formatos
   liquidationData.Total_Descuento = extractMonetaryValue(
     /TOTAL\s+DESCUENTO\s+\$\s*([\d.,]+)/i,
     text
   );
   if (liquidationData.Total_Descuento === '0.00') {
     liquidationData.Total_Descuento = extractMonetaryValue(
-      /TOTAL\s+DESCUENTO\s+([\d.,]+)/i,
+      /TOTAL\s+DESCUENTO\s+\$?\s*TOTAL[^\d]*([\d.,]+)/i,
       text
     );
   }
+  if (liquidationData.Total_Descuento === '0.00') {
+    const match = text.match(/TOTAL\s+DESCUENTO\s+\$[^\d\n]*([\d.,]+)/i);
+    if (match) liquidationData.Total_Descuento = normalizeNumber(match[1]);
+  }
 
+  // SALDO - intentar varios formatos
   liquidationData.Saldo = extractMonetaryValue(
     /SALDO\s+\$\s*([\d.,]+)/i,
     text
   );
   if (liquidationData.Saldo === '0.00') {
     liquidationData.Saldo = extractMonetaryValue(
-      /SALDO\s+([\d.,]+)/i,
+      /SALDO\s+\$?\s*SALDO[^\d]*([\d.,]+)/i,
       text
     );
+  }
+  if (liquidationData.Saldo === '0.00') {
+    const match = text.match(/SALDO\s+\$[^\d\n]*([\d.,]+)/i);
+    if (match) liquidationData.Saldo = normalizeNumber(match[1]);
   }
 
   liquidationData.IVA = extractMonetaryValue(
