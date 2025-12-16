@@ -23,13 +23,36 @@ function clean(s: string | null): string {
 function normalizeNumber(s: string | null): string {
   if (!s) return '0.00';
 
-  let cleaned = String(s);
+  let cleaned = String(s).trim();
+
   // Quitar todo excepto dígitos, coma, punto y signo
   cleaned = cleaned.replace(/[^\d,.\-]/g, '');
-  // Quitar puntos de miles
-  cleaned = cleaned.replace(/\./g, '');
-  // Coma decimal -> punto
-  cleaned = cleaned.replace(',', '.');
+
+  // Manejar formato argentino: punto para miles, coma para decimales
+  // Si tiene puntos Y comas, los puntos son miles
+  if (cleaned.includes('.') && cleaned.includes(',')) {
+    cleaned = cleaned.replace(/\./g, ''); // Quitar puntos de miles
+    cleaned = cleaned.replace(',', '.'); // Coma decimal -> punto
+  }
+  // Si solo tiene puntos (puede ser miles o decimales)
+  else if (cleaned.includes('.')) {
+    // Si tiene múltiples puntos, son miles
+    const dotCount = (cleaned.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      cleaned = cleaned.replace(/\./g, '');
+    }
+    // Si tiene un solo punto y más de 2 dígitos después, probablemente es miles
+    else {
+      const afterDot = cleaned.split('.')[1];
+      if (afterDot && afterDot.length > 2) {
+        cleaned = cleaned.replace('.', '');
+      }
+    }
+  }
+  // Si solo tiene coma, convertir a punto decimal
+  else if (cleaned.includes(',')) {
+    cleaned = cleaned.replace(',', '.');
+  }
 
   const match = cleaned.match(/-?\d+(?:\.\d+)?/);
   return match ? match[0] : '0.00';
@@ -113,21 +136,41 @@ export async function processCardLiquidation(buffer: Buffer, filename: string): 
 
   liquidationData.Establecimiento = extractValueBelow('Establecimiento', text, 1);
 
-  // Valores monetarios con regex
+  // Valores monetarios con regex mejorados para capturar formatos variados
+  // Intentar primero con el formato estándar "TOTAL PRESENTADO $"
   liquidationData.Total_Presentado = extractMonetaryValue(
-    /TOTAL\s+PRESENTADO\s+\$?\s*([\d.,]+)/i,
+    /TOTAL\s+PRESENTADO\s+\$\s*([\d.,]+)/i,
     text
   );
+  // Si no encuentra, intentar sin el signo $
+  if (liquidationData.Total_Presentado === '0.00') {
+    liquidationData.Total_Presentado = extractMonetaryValue(
+      /TOTAL\s+PRESENTADO\s+([\d.,]+)/i,
+      text
+    );
+  }
 
   liquidationData.Total_Descuento = extractMonetaryValue(
-    /TOTAL\s+DESCUENTO\s+\$?\s*([\d.,]+)/i,
+    /TOTAL\s+DESCUENTO\s+\$\s*([\d.,]+)/i,
     text
   );
+  if (liquidationData.Total_Descuento === '0.00') {
+    liquidationData.Total_Descuento = extractMonetaryValue(
+      /TOTAL\s+DESCUENTO\s+([\d.,]+)/i,
+      text
+    );
+  }
 
   liquidationData.Saldo = extractMonetaryValue(
-    /SALDO\s+\$?\s*([\d.,]+)/i,
+    /SALDO\s+\$\s*([\d.,]+)/i,
     text
   );
+  if (liquidationData.Saldo === '0.00') {
+    liquidationData.Saldo = extractMonetaryValue(
+      /SALDO\s+([\d.,]+)/i,
+      text
+    );
+  }
 
   liquidationData.IVA = extractMonetaryValue(
     /IVA\s+21[.,]?00\s*%?\s*\$?\s*([\d.,]+)/i,
