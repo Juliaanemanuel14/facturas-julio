@@ -65,7 +65,14 @@ function extractValueBelow(field: string, text: string, linesBelow: number = 1):
     if (lines[i].includes(field)) {
       const targetIndex = i + linesBelow;
       if (targetIndex < lines.length) {
-        return clean(lines[targetIndex]);
+        const valor = clean(lines[targetIndex]);
+
+        // Si parece un número monetario, normalizarlo
+        if (/[\d.,]+/.test(valor)) {
+          return normalizeNumber(valor);
+        }
+
+        return valor;
       }
     }
   }
@@ -136,54 +143,45 @@ export async function processCardLiquidation(buffer: Buffer, filename: string): 
 
   liquidationData.Establecimiento = extractValueBelow('Establecimiento', text, 1);
 
-  // Valores monetarios con múltiples intentos de regex
-  // TOTAL PRESENTADO - intentar varios formatos
-  liquidationData.Total_Presentado = extractMonetaryValue(
-    /TOTAL\s+PRESENTADO\s+\$\s*([\d.,]+)/i,
-    text
-  );
-  if (liquidationData.Total_Presentado === '0.00') {
+  // TOTAL PRESENTADO - usar extractValueBelow como en el script Python
+  // Python usa 29 líneas abajo, intentaremos varios offsets
+  liquidationData.Total_Presentado = extractValueBelow('TOTAL PRESENTADO $', text, 29) ||
+                                      extractValueBelow('TOTAL PRESENTADO $', text, 1) ||
+                                      extractValueBelow('TOTAL PRESENTADO $', text, 2);
+
+  // Si no encontró, intentar con regex
+  if (!liquidationData.Total_Presentado || liquidationData.Total_Presentado === '0.00') {
     liquidationData.Total_Presentado = extractMonetaryValue(
-      /TOTAL\s+PRESENTADO\s+\$?\s*TOTAL[^\d]*([\d.,]+)/i,
+      /TOTAL\s+PRESENTADO\s+\$\s*([\d.,]+)/i,
       text
     );
   }
-  if (liquidationData.Total_Presentado === '0.00') {
-    // Buscar después de "TOTAL PRESENTADO $" en la misma línea o siguiente
-    const match = text.match(/TOTAL\s+PRESENTADO\s+\$[^\d\n]*([\d.,]+)/i);
-    if (match) liquidationData.Total_Presentado = normalizeNumber(match[1]);
-  }
 
-  // TOTAL DESCUENTO - intentar varios formatos
-  liquidationData.Total_Descuento = extractMonetaryValue(
-    /TOTAL\s+DESCUENTO\s+\$\s*([\d.,]+)/i,
-    text
-  );
-  if (liquidationData.Total_Descuento === '0.00') {
+  // TOTAL DESCUENTO - usar extractValueBelow como en el script Python
+  liquidationData.Total_Descuento = extractValueBelow('TOTAL DESCUENTO $', text, 29) ||
+                                      extractValueBelow('TOTAL DESCUENTO', text, 29) ||
+                                      extractValueBelow('TOTAL DESCUENTO $', text, 1) ||
+                                      extractValueBelow('TOTAL DESCUENTO', text, 1);
+
+  // Si no encontró, intentar con regex
+  if (!liquidationData.Total_Descuento || liquidationData.Total_Descuento === '0.00') {
     liquidationData.Total_Descuento = extractMonetaryValue(
-      /TOTAL\s+DESCUENTO\s+\$?\s*TOTAL[^\d]*([\d.,]+)/i,
+      /TOTAL\s+DESCUENTO\s+\$\s*([\d.,]+)/i,
       text
     );
-  }
-  if (liquidationData.Total_Descuento === '0.00') {
-    const match = text.match(/TOTAL\s+DESCUENTO\s+\$[^\d\n]*([\d.,]+)/i);
-    if (match) liquidationData.Total_Descuento = normalizeNumber(match[1]);
   }
 
-  // SALDO - intentar varios formatos
-  liquidationData.Saldo = extractMonetaryValue(
-    /SALDO\s+\$\s*([\d.,]+)/i,
-    text
-  );
-  if (liquidationData.Saldo === '0.00') {
+  // SALDO - usar extractValueBelow como en el script Python
+  liquidationData.Saldo = extractValueBelow('SALDO $', text, 29) ||
+                          extractValueBelow('SALDO $', text, 1) ||
+                          extractValueBelow('SALDO', text, 29);
+
+  // Si no encontró, intentar con regex
+  if (!liquidationData.Saldo || liquidationData.Saldo === '0.00') {
     liquidationData.Saldo = extractMonetaryValue(
-      /SALDO\s+\$?\s*SALDO[^\d]*([\d.,]+)/i,
+      /SALDO\s+\$\s*([\d.,]+)/i,
       text
     );
-  }
-  if (liquidationData.Saldo === '0.00') {
-    const match = text.match(/SALDO\s+\$[^\d\n]*([\d.,]+)/i);
-    if (match) liquidationData.Saldo = normalizeNumber(match[1]);
   }
 
   liquidationData.IVA = extractMonetaryValue(
