@@ -1,0 +1,788 @@
+[
+  {
+    "Etiqueta":"RIBSARC",
+    "Local":"RIBS INFANTA",
+    "Razon Social":"9 REINAS S. A.",
+    "Cuit":"33-71733161-9"
+  },
+  {
+    "Etiqueta":"NMDE",
+    "Local":"NOMADE",
+    "Razon Social":"MUSSELINA S.A.",
+    "Cuit":"30-71718649-0"
+  },
+  {
+    "Etiqueta":"CMSUCRE",
+    "Local":"SUCRE",
+    "Razon Social":"ARAUKEN",
+    "Cuit":"30-71772432-8"
+  },
+  {
+    "Etiqueta":"KONA",
+    "Local":"KONA",
+    "Razon Social":"PARMENTTIER",
+    "Cuit":"30-71779620-5"
+  },
+  {
+    "Etiqueta":"WILLIAM06",
+    "Local":"W BELGRANO",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"HINFA01",
+    "Local":"AT LOV",
+    "Razon Social":"PARMENTTIER",
+    "Cuit":"30-71779620-5"
+  },
+  {
+    "Etiqueta":"ALMAFABRIC",
+    "Local":"FABRIC I",
+    "Razon Social":"SOLOPACA S.A.",
+    "Cuit":"30-71679055-6"
+  },
+  {
+    "Etiqueta":"PHOUSE",
+    "Local":"POLO HOUSE",
+    "Razon Social":"EL SALON RECOVA",
+    "Cuit":"30-71818549-8"
+  },
+  {
+    "Etiqueta":"NMDE02",
+    "Local":"POLO HOUSE",
+    "Razon Social":"EL SALON RECOVA",
+    "Cuit":"30-71818549-8"
+  },
+  {
+    "Etiqueta":"LIB01",
+    "Local":"TALLARICA",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"CRZ01",
+    "Local":"CRUZA POLO",
+    "Razon Social":"CRUZZAPOLO S.A.",
+    "Cuit":"30-71820617-7"
+  },
+  {
+    "Etiqueta":"CRUZAREC",
+    "Local":"CRUZA RECOLETA",
+    "Razon Social":"MOJAMA S.A.",
+    "Cuit":"30-71682300-4"
+  },
+  {
+    "Etiqueta":"VIETNAM",
+    "Local":"COCHINCHINA",
+    "Razon Social":"RABBLE S.A.",
+    "Cuit":"30-71695295-5"
+  },
+  {
+    "Etiqueta":"LAMALA",
+    "Local":"LA MALA",
+    "Razon Social":"RISSOLAR PILAR S.A.",
+    "Cuit":"30-71662099-5"
+  },
+  {
+    "Etiqueta":"Lamalita",
+    "Local":"LA MALA",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"WILLINF",
+    "Local":"W INFANTA",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"ALMF01",
+    "Local":"FABRIC I",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"WLLY06",
+    "Local":"W BELGRANO",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"TLL01",
+    "Local":"TALLARICA",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"BETULAR",
+    "Local":"OMINT",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"PARRIPEPE",
+    "Local":"PARRILLA PP",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"HSBC",
+    "Local":"HSBC",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"LCHICKEN",
+    "Local":"LAKY",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"4KIDS",
+    "Local":"4 KIDS",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BENAIM",
+    "Local":"BENAIM",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"RIBSPOLO",
+    "Local":"RIBS POLO",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"MADRE",
+    "Local":"MADRE",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BCDO",
+    "Local":"BOCADO",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"PLANTAS",
+    "Local":"PLANT POWER",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"SKOL",
+    "Local":"SKOL",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BRIDACAFE",
+    "Local":"NUBE",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"TBR01",
+    "Local":"POLO GRILL",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"ELCANDY",
+    "Local":"CANDY",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BOCT",
+    "Local":"BARRA CAFE NEW",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"LLCH",
+    "Local":"LECHERIA",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"VLT01",
+    "Local":"FT VOLTA",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"VLT02",
+    "Local":"FT VOLTA",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"ARTID",
+    "Local":"ART IN THE DARK",
+    "Razon Social":"BAYONNA S.A.",
+    "Cuit":"30-71794201-5"
+  },
+  {
+    "Etiqueta":"TLLA02",
+    "Local":"TALLARICA POLO",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"BOCHA",
+    "Local":"BOCHA",
+    "Razon Social":"SOLOPACA S.A.",
+    "Cuit":"30-71679055-6"
+  },
+  {
+    "Etiqueta":"BAHAMAS",
+    "Local":"COSTA",
+    "Razon Social":"EL PIBE DORREGO S.A.",
+    "Cuit":"33-71618270-9"
+  },
+  {
+    "Etiqueta":"CATEP",
+    "Local":"CATERING",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"PG00",
+    "Local":"POLO GRAL",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"EV01",
+    "Local":"IMAGINA",
+    "Razon Social":"BAYONNA S.A.",
+    "Cuit":"30-71794201-5"
+  },
+  {
+    "Etiqueta":"SALG01",
+    "Local":"MIL VIDAS",
+    "Razon Social":"ESCABECHE S.A",
+    "Cuit":"30-71794040-3"
+  },
+  {
+    "Etiqueta":"OFPARAGUAY",
+    "Local":"OF PARAGUAY",
+    "Razon Social":"GESTION DE RECURSOS NG S.A.",
+    "Cuit":"30-71829929-9"
+  },
+  {
+    "Etiqueta":"IMB00",
+    "Local":"IMAGINA",
+    "Razon Social":"BAYONNA S.A.",
+    "Cuit":"30-71794201-5"
+  },
+  {
+    "Etiqueta":"GRNG00",
+    "Local":"GESTION DE RECURSOS",
+    "Razon Social":"GESTION DE RECURSOS NG S.A.",
+    "Cuit":"30-71829929-9"
+  },
+  {
+    "Etiqueta":"INA003",
+    "Local":"SUCRE",
+    "Razon Social":"SUCRE 664 S.A.",
+    "Cuit":"30-71525940-7"
+  },
+  {
+    "Etiqueta":"PRS00",
+    "Local":"PERSEO",
+    "Razon Social":"PERSEO & CO S.A.",
+    "Cuit":"30-71699524-7"
+  },
+  {
+    "Etiqueta":"INA010",
+    "Local":"CRUZA POLO",
+    "Razon Social":"CRUZZAPOLO S.A.",
+    "Cuit":"30-71820617-7"
+  },
+  {
+    "Etiqueta":"INA002",
+    "Local":"LA MALA",
+    "Razon Social":"RISSOLAR PILAR S.A.",
+    "Cuit":"30-71662099-5"
+  },
+  {
+    "Etiqueta":"Cochinchina",
+    "Local":"COCHINCHINA",
+    "Razon Social":"RABBLE S.A.",
+    "Cuit":"30-71695295-5"
+  },
+  {
+    "Etiqueta":"BY00",
+    "Local":"BAYONNA",
+    "Razon Social":"BAYONNA S.A.",
+    "Cuit":"30-71794201-5"
+  },
+  {
+    "Etiqueta":"9RN00",
+    "Local":"9 REINAS",
+    "Razon Social":"9 REINAS S. A.",
+    "Cuit":"33-71733161-9"
+  },
+  {
+    "Etiqueta":"CRZ00",
+    "Local":"CRUZZA",
+    "Razon Social":"CRUZZAPOLO S.A.",
+    "Cuit":"30-71820617-7"
+  },
+  {
+    "Etiqueta":"ARK00",
+    "Local":"ARAUKEN",
+    "Razon Social":"ARAUKEN",
+    "Cuit":"30-71772432-8"
+  },
+  {
+    "Etiqueta":"PRT00",
+    "Local":"PARMENTTIER",
+    "Razon Social":"PARMENTTIER",
+    "Cuit":"30-71779620-5"
+  },
+  {
+    "Etiqueta":"CSSE00",
+    "Local":"CONCASSE",
+    "Razon Social":"CONCASSE DEL PILAR S.A.",
+    "Cuit":"30-71603934-6"
+  },
+  {
+    "Etiqueta":"MUSS00",
+    "Local":"MUSSELINA",
+    "Razon Social":"MUSSELINA S.A.",
+    "Cuit":"30-71718649-0"
+  },
+  {
+    "Etiqueta":"CRUZZAPOLO",
+    "Local":"CRUZZA",
+    "Razon Social":"CRUZZAPOLO S.A.",
+    "Cuit":"30-71820617-7"
+  },
+  {
+    "Etiqueta":"ESC00",
+    "Local":"ESCABECHE",
+    "Razon Social":"ESCABECHE S.A",
+    "Cuit":"30-71794040-3"
+  },
+  {
+    "Etiqueta":"ELSALONRECOVA,PHOUSE",
+    "Local":"POLO HOUSE",
+    "Razon Social":"EL SALON RECOVA",
+    "Cuit":"30-71818549-8"
+  },
+  {
+    "Etiqueta":"GGP00",
+    "Local":"GASTRO GRAL",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"CMSUCRE,SIN009",
+    "Local":"SUCRE",
+    "Razon Social":"ARAUKEN",
+    "Cuit":"30-71772432-8"
+  },
+  {
+    "Etiqueta":"OPENHURLINGHAM",
+    "Local":"HURLINGHAM",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"CST",
+    "Local":"COSTA",
+    "Razon Social":"EL PIBE DORREGO S.A.",
+    "Cuit":"33-71618270-9"
+  },
+  {
+    "Etiqueta":"CCHH",
+    "Local":"COCHINCHINA",
+    "Razon Social":"RABBLE S.A.",
+    "Cuit":"30-71695295-5"
+  },
+  {
+    "Etiqueta":"MATCH",
+    "Local":"MATCH",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"RIPO",
+    "Local":"RIBS POLO",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"LACKY",
+    "Local":"LAKY",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"LCH",
+    "Local":"LECHERIA",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"4KIDS01",
+    "Local":"CANDY",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"CANDY",
+    "Local":"CANDY",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"MUSSELINA",
+    "Local":"NOMADE",
+    "Razon Social":"MUSSELINA S.A.",
+    "Cuit":"30-71718649-0"
+  },
+  {
+    "Etiqueta":"GP00",
+    "Local":"POLO GRAL",
+    "Razon Social":"GESTION POLO S.A.",
+    "Cuit":"30-71725410-0"
+  },
+  {
+    "Etiqueta":"BT515",
+    "Local":"RIBS POLO",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BT212",
+    "Local":"LAKY",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BT414",
+    "Local":"MADRE",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BT313",
+    "Local":"MATCH",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"BT616",
+    "Local":"LECHERIA",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"EX7D7",
+    "Local":"NUBE",
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"TSTTR01",
+    "Local":"TOSTADO TRENES",
+    "Razon Social":"GOURMAND S.A",
+    "Cuit":"33-71610329-9"
+  },
+  {
+    "Etiqueta":"CATEW",
+    "Local":"CATERING WILLIAMS",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"RABBLE00",
+    "Local":null,
+    "Razon Social":"RABBLE S.A.",
+    "Cuit":"30-71695295-5"
+  },
+  {
+    "Etiqueta":"PDORREGO00",
+    "Local":null,
+    "Razon Social":"EL PIBE DORREGO S.A.",
+    "Cuit":"33-71618270-9"
+  },
+  {
+    "Etiqueta":"SPEN00",
+    "Local":null,
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"WINFANTA",
+    "Local":"WILLIAMS INFANTA\/ ARCOS",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"LMLTA",
+    "Local":"LA MALITA",
+    "Razon Social":"SOLPEN S.A.",
+    "Cuit":"33-71670661-9"
+  },
+  {
+    "Etiqueta":"ALM01",
+    "Local":"ALMA CERRITO",
+    "Razon Social":"GOURMAND S.A",
+    "Cuit":"33-71610329-9"
+  },
+  {
+    "Etiqueta":"CRZ02",
+    "Local":"CRUZA RECOLETA",
+    "Razon Social":"MOJAMA S.A.",
+    "Cuit":"30-71682300-4"
+  },
+  {
+    "Etiqueta":"CPOGO00",
+    "Local":null,
+    "Razon Social":"CAMPOLUOGO S.A.",
+    "Cuit":"33-71670708-9"
+  },
+  {
+    "Etiqueta":"MJM00",
+    "Local":null,
+    "Razon Social":"MOJAMA S.A.",
+    "Cuit":"30-71682300-4"
+  },
+  {
+    "Etiqueta":"SRCOVA00",
+    "Local":null,
+    "Razon Social":"EL SALON RECOVA",
+    "Cuit":"30-71818549-8"
+  },
+  {
+    "Etiqueta":"GOU00",
+    "Local":null,
+    "Razon Social":"GOURMAND S.A",
+    "Cuit":"33-71610329-9"
+  },
+  {
+    "Etiqueta":"FL00",
+    "Local":null,
+    "Razon Social":"FLAMBE S.A.",
+    "Cuit":"30-71718678-4"
+  },
+  {
+    "Etiqueta":"MINCEB00",
+    "Local":null,
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"RISSOLAR00",
+    "Local":null,
+    "Razon Social":"RISSOLAR PILAR S.A.",
+    "Cuit":"30-71662099-5"
+  },
+  {
+    "Etiqueta":"OPG001",
+    "Local":"LA MALA",
+    "Razon Social":"RISSOLAR PILAR S.A.",
+    "Cuit":"30-71662099-5"
+  },
+  {
+    "Etiqueta":"PPG",
+    "Local":"TODO BRASAS",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"EX6D6",
+    "Local":"VOLTA",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"EX4D4",
+    "Local":"TALLARICA",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"RCTLS",
+    "Local":null,
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"ESPACIO7",
+    "Local":null,
+    "Razon Social":"EPACIO7",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"EX5D5",
+    "Local":null,
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"OPG003",
+    "Local":null,
+    "Razon Social":"MOJAMA S.A.",
+    "Cuit":"30-71682300-4"
+  },
+  {
+    "Etiqueta":"INA009",
+    "Local":null,
+    "Razon Social":"SABBORES S.A.",
+    "Cuit":"30-71548579-2"
+  },
+  {
+    "Etiqueta":"INA004",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"INA013",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"SIN013",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"INA001",
+    "Local":null,
+    "Razon Social":"POCAS NUECES SOCIEDAD ANONIMA",
+    "Cuit":"30-71624693-7"
+  },
+  {
+    "Etiqueta":"ARM01",
+    "Local":"RABBLE",
+    "Razon Social":"RABBLE S.A.",
+    "Cuit":"30-71695295-5"
+  },
+  {
+    "Etiqueta":"INA006",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"OFCERRITO",
+    "Local":null,
+    "Razon Social":"OFICINA CERRITO",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"SIN014",
+    "Local":null,
+    "Razon Social":"LA RECOVA BAR S.R.L",
+    "Cuit":"30-71577324-0"
+  },
+  {
+    "Etiqueta":"PGG00",
+    "Local":"MINCE",
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"LOKANTA",
+    "Local":"FLAMBE",
+    "Razon Social":"FLAMBE S.A.",
+    "Cuit":"30-71718678-4"
+  },
+  {
+    "Etiqueta":"PEP",
+    "Local":"FLAMBE",
+    "Razon Social":"PLANTA DE ELABORACION POLO",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"INA008",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"SIN012",
+    "Local":null,
+    "Razon Social":"INACTIVA",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"BBR00",
+    "Local":null,
+    "Razon Social":"BEERBAR",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"SP00",
+    "Local":null,
+    "Razon Social":"SOLOPACA S.A.",
+    "Cuit":"30-71679055-6"
+  },
+  {
+    "Etiqueta":"OFLIMA04",
+    "Local":null,
+    "Razon Social":"Oficina Lima 4to",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"PGREC",
+    "Local":null,
+    "Razon Social":"MOJAMA S.A.",
+    "Cuit":"30-71682300-4"
+  },
+  {
+    "Etiqueta":"SIN015",
+    "Local":null,
+    "Razon Social":"Fricase",
+    "Cuit":null
+  },
+  {
+    "Etiqueta":"EX1I1",
+    "Local":null,
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  },
+  {
+    "Etiqueta":"ESS",
+    "Local":null,
+    "Razon Social":"SOLOPACA S.A.",
+    "Cuit":"30-71679055-6"
+  },
+  {
+    "Etiqueta":"SIN006",
+    "Local":null,
+    "Razon Social":"MACHIATTO S.A.",
+    "Cuit":"30-71599165-5"
+  },
+  {
+    "Etiqueta":"INA007",
+    "Local":null,
+    "Razon Social":"MACHIATTO S.A.",
+    "Cuit":"30-71599165-5"
+  },
+  {
+    "Etiqueta":"OSS",
+    "Local":null,
+    "Razon Social":"NOLA ARCOS S.A.",
+    "Cuit":"33-71602943-9"
+  },
+  {
+    "Etiqueta":"EX9D9",
+    "Local":null,
+    "Razon Social":"MINCE BAR S.A.S.",
+    "Cuit":"30-71603714-9"
+  }
+]

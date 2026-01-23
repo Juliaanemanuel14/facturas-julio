@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion';
 
 export default function Home() {
   const router = useRouter();
@@ -12,6 +12,12 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+
+  // Para conciliación: archivos separados
+  const [oppenFile, setOppenFile] = useState<File | null>(null);
+  const [arcaConcilFile, setArcaConcilFile] = useState<File | null>(null);
+  const [isDraggingOppen, setIsDraggingOppen] = useState(false);
+  const [isDraggingArcaConcil, setIsDraggingArcaConcil] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -44,6 +50,11 @@ export default function Home() {
         if (selectedType === 'proveedores') {
           return file.type === 'application/pdf' || file.type.startsWith('image/');
         }
+        if (selectedType === 'conciliacion') {
+          return file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ||
+                 file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                 file.type === 'application/vnd.ms-excel';
+        }
         return file.type === 'application/pdf';
       }
     );
@@ -64,8 +75,45 @@ export default function Home() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Handlers para conciliación - Oppen
+  const handleDropOppen = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOppen(false);
+    const file = Array.from(e.dataTransfer.files).find(
+      f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
+    );
+    if (file) setOppenFile(file);
+  }, []);
+
+  const handleFileInputOppen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setOppenFile(e.target.files[0]);
+    }
+  };
+
+  // Handlers para conciliación - ARCA
+  const handleDropArcaConcil = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingArcaConcil(false);
+    const file = Array.from(e.dataTransfer.files).find(
+      f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
+    );
+    if (file) setArcaConcilFile(file);
+  }, []);
+
+  const handleFileInputArcaConcil = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setArcaConcilFile(e.target.files[0]);
+    }
+  };
+
   const handleProcess = async () => {
-    if (files.length === 0 || !selectedType) return;
+    // Para conciliación, verificar archivos separados
+    if (selectedType === 'conciliacion') {
+      if (!oppenFile || !arcaConcilFile) return;
+    } else {
+      if (files.length === 0 || !selectedType) return;
+    }
 
     setIsProcessing(true);
     setProcessedCount(0);
@@ -75,11 +123,13 @@ export default function Home() {
                         selectedType === 'liquidaciones' ? '/api/process-liquidations' :
                         selectedType === 'ddjj' ? '/api/process-ddjj' :
                         selectedType === 'proveedores' ? '/api/process-proveedores' :
+                        selectedType === 'conciliacion' ? '/api/conciliacion-fc' :
                         '/api/process-arca';
     const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
                              selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
                              selectedType === 'ddjj' ? 'ddjj_iva.xlsx' :
                              selectedType === 'proveedores' ? 'facturas_proveedores.xlsx' :
+                             selectedType === 'conciliacion' ? 'Conciliacion_Final_Analizada.xlsx' :
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
@@ -133,6 +183,39 @@ export default function Home() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+      } else if (selectedType === 'conciliacion' && oppenFile && arcaConcilFile) {
+        // Para conciliación, enviar los 2 archivos específicos
+        const formData = new FormData();
+        formData.append('files', oppenFile);
+        formData.append('files', arcaConcilFile);
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Error processing files');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        setProcessedCount(2);
+        setTimeout(() => {
+          setOppenFile(null);
+          setArcaConcilFile(null);
+          setProcessedCount(0);
+        }, 3000);
+        setIsProcessing(false);
+        return;
       } else {
         // Para otros tipos o pocos archivos, enviar todo junto
         const formData = new FormData();
@@ -177,6 +260,8 @@ export default function Home() {
     setSelectedType(null);
     setFiles([]);
     setProcessedCount(0);
+    setOppenFile(null);
+    setArcaConcilFile(null);
   };
 
   return (
@@ -222,7 +307,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -407,12 +492,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('conciliacion')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-cyan-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-teal-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-400 to-teal-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Conciliación FC Compra
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Concilia facturas Oppen vs ARCA
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Matcheo por ID compuesto</p>
+                  <p>✓ Diagnóstico de errores</p>
+                  <p>✓ Filtro de proveedores</p>
+                  <p>✓ Detección de faltantes</p>
+                  <p>✓ Excel con formato</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -444,7 +566,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -455,54 +577,177 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="gradient-border mb-8">
-              <div
-                className={`gradient-border-content upload-zone p-12 text-center cursor-pointer ${
-                  isDragging ? 'dragging' : ''
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById('fileInput')?.click()}
-              >
-                <input
-                  id="fileInput"
-                  type="file"
-                  multiple
-                  accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : '.pdf'}
-                  onChange={handleFileInput}
-                  className="hidden"
-                />
+            {selectedType === 'conciliacion' ? (
+              /* Interfaz especial para conciliación: 2 zonas de subida */
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                {/* Zona Oppen */}
+                <div className="gradient-border">
+                  <div
+                    className={`gradient-border-content upload-zone p-8 text-center cursor-pointer ${
+                      isDraggingOppen ? 'dragging' : ''
+                    } ${oppenFile ? 'border-green-500' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingOppen(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDraggingOppen(false); }}
+                    onDrop={handleDropOppen}
+                    onClick={() => document.getElementById('oppenFileInput')?.click()}
+                  >
+                    <input
+                      id="oppenFileInput"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileInputOppen}
+                      className="hidden"
+                    />
 
-                <div className="flex flex-col items-center">
-                  <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                    <svg
-                      className="w-12 h-12 text-primary"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-16 h-16 mb-4 rounded-full ${oppenFile ? 'bg-green-500' : 'bg-gradient-to-br from-orange-400 to-amber-600'} flex items-center justify-center`}>
+                        {oppenFile ? (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl font-semibold mb-2 text-orange-500">
+                        Archivo OPPEN
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">
+                        Listado de Facturas de Compra
+                      </p>
+                      {oppenFile ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-500 font-medium truncate max-w-[200px]">{oppenFile.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOppenFile(null); }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-400 to-amber-600 text-white rounded-lg font-medium text-sm">
+                          Seleccionar Excel
+                        </div>
+                      )}
+                    </div>
                   </div>
+                </div>
 
-                  <h3 className="text-2xl font-semibold mb-2">
-                    Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : 'PDF'} aquí
-                  </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    o haz clic para seleccionarlos
-                  </p>
-                  <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-shadow">
-                    Seleccionar archivos
+                {/* Zona ARCA */}
+                <div className="gradient-border">
+                  <div
+                    className={`gradient-border-content upload-zone p-8 text-center cursor-pointer ${
+                      isDraggingArcaConcil ? 'dragging' : ''
+                    } ${arcaConcilFile ? 'border-green-500' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingArcaConcil(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDraggingArcaConcil(false); }}
+                    onDrop={handleDropArcaConcil}
+                    onClick={() => document.getElementById('arcaConcilFileInput')?.click()}
+                  >
+                    <input
+                      id="arcaConcilFileInput"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileInputArcaConcil}
+                      className="hidden"
+                    />
+
+                    <div className="flex flex-col items-center">
+                      <div className={`w-16 h-16 mb-4 rounded-full ${arcaConcilFile ? 'bg-green-500' : 'bg-gradient-to-br from-cyan-400 to-teal-600'} flex items-center justify-center`}>
+                        {arcaConcilFile ? (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl font-semibold mb-2 text-cyan-500">
+                        Archivo ARCA
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">
+                        Comprobantes descargados de AFIP
+                      </p>
+                      {arcaConcilFile ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-500 font-medium truncate max-w-[200px]">{arcaConcilFile.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setArcaConcilFile(null); }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-cyan-400 to-teal-600 text-white rounded-lg font-medium text-sm">
+                          Seleccionar Excel
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="gradient-border mb-8">
+                <div
+                  className={`gradient-border-content upload-zone p-12 text-center cursor-pointer ${
+                    isDragging ? 'dragging' : ''
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById('fileInput')?.click()}
+                >
+                  <input
+                    id="fileInput"
+                    type="file"
+                    multiple
+                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : '.pdf'}
+                    onChange={handleFileInput}
+                    className="hidden"
+                  />
+
+                  <div className="flex flex-col items-center">
+                    <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                      <svg
+                        className="w-12 h-12 text-primary"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                    </div>
+
+                    <h3 className="text-2xl font-semibold mb-2">
+                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : 'PDF'} aquí
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                      o haz clic para seleccionarlos
+                    </p>
+                    <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-shadow">
+                      Seleccionar archivos
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {files.length > 0 && (
               <div className="mb-8">
@@ -567,11 +812,11 @@ export default function Home() {
               </div>
             )}
 
-            {files.length > 0 && (
+            {(files.length > 0 || (selectedType === 'conciliacion' && oppenFile && arcaConcilFile)) && (
               <div className="text-center">
                 <button
                   onClick={handleProcess}
-                  disabled={isProcessing}
+                  disabled={isProcessing || (selectedType === 'conciliacion' && (!oppenFile || !arcaConcilFile))}
                   className="inline-flex items-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-primary via-secondary to-accent rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isProcessing ? (
