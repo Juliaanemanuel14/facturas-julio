@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
+  // TEMPORAL: Autenticación deshabilitada para desarrollo
+  // Permitir acceso a todas las rutas sin verificación
+  return NextResponse.next();
+
+  /* DESHABILITADO TEMPORALMENTE
   const { pathname } = request.nextUrl;
 
   // Rutas públicas que no requieren autenticación
@@ -49,6 +54,7 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
+  */
 }
 
 // Configurar en qué rutas se ejecuta el middleware

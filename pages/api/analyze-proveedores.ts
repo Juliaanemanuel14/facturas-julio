@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { File } from 'formidable';
 import fs from 'fs';
-import { processProveedorInvoice } from '@/lib/proveedoresProcessor';
-import { PROVIDER_TYPES } from '@/lib/proveedoresConfig';
+import { processMultipleInvoices } from '@/lib/proveedoresProcessor';
 
 export const config = {
   api: {
@@ -23,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       keepExtensions: true,
     });
 
-    const [fields, files] = await new Promise<[formidable.Fields, formidable.Files]>((resolve, reject) => {
+    const [, files] = await new Promise<[formidable.Fields, formidable.Files]>((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) reject(err);
         else resolve([fields, files]);
@@ -39,35 +38,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`Analyzing ${validFiles.length} files...`);
 
-    const results = [];
+    // Preparar archivos para procesamiento paralelo
+    const filesToProcess = validFiles.map(file => ({
+      buffer: fs.readFileSync(file.filepath),
+      fileName: file.originalFilename || 'unknown',
+      mimeType: file.mimetype || 'application/octet-stream',
+      filepath: file.filepath,
+    }));
 
-    for (const file of validFiles) {
+    // Procesar en paralelo con límite de concurrencia (3 archivos simultáneos)
+    const results = await processMultipleInvoices(
+      filesToProcess.map(f => ({ buffer: f.buffer, fileName: f.fileName, mimeType: f.mimeType })),
+      3
+    );
+
+    // Limpiar archivos temporales
+    for (const file of filesToProcess) {
       try {
-        const buffer = fs.readFileSync(file.filepath);
-        const fileName = file.originalFilename || 'unknown';
-        const mimeType = file.mimetype || 'application/octet-stream';
-
-        console.log(`Processing: ${fileName} (${mimeType})`);
-
-        const data = await processProveedorInvoice(buffer, fileName, mimeType);
-        results.push(data);
-
-        console.log(`Processed: ${fileName} - ${data.items.length} items extracted`);
-
-        // Limpiar archivo temporal
-        try {
-          fs.unlinkSync(file.filepath);
-        } catch (e) {
-          console.warn('Could not delete temp file:', e);
-        }
-      } catch (fileError) {
-        console.error(`Error processing file ${file.originalFilename}:`, fileError);
-        results.push({
-          fileName: file.originalFilename || 'unknown',
-          provider: PROVIDER_TYPES.GENERAL,
-          items: [],
-          error: fileError instanceof Error ? fileError.message : 'Unknown error',
-        });
+        fs.unlinkSync(file.filepath);
+      } catch (e) {
+        console.warn('Could not delete temp file:', e);
       }
     }
 

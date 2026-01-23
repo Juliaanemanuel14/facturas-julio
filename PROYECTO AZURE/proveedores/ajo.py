@@ -1,80 +1,72 @@
 # -*- coding: utf-8 -*-
 # proveedores/ajo.py
-#
-# Este plugin se activa cuando el nombre del archivo de la factura
-# matchea alguno de los patrones en PATTERNS.
-# El flujo principal leerá PROMPT y lo concatenará al prompt base
-# antes de llamar a Gemini para extracción FULL.
 
-# Coincidencias contra el nombre del archivo (re.search con flags=re.I)
 PATTERNS = [
-    r"(?i)Ajo",
+    r"(?i)\bAJO\b",
+    r"(?i)\bTUFUD\b",
+    r"(?i)\bRIBS\s+AL\s+RIO\b",
+    r"(?i)TUFUD",
 ]
 
-# Prompt específico para este proveedor.
-# NOTA: En este flujo NO se usa {download_url}; la imagen/PDF se pasa como bytes.
 PROMPT = """
-Estás en rol de un analista de datos que extrae DETALLE DE ÍTEMS desde la imagen/PDF de una factura gastronómica de este proveedor.
+Prompt Maestro: Procesador TUFUD / AJO (Lógica Remito + IVA Externo)
 
-Salidas y formato EXIGIDOS (muy importante):
-- Debes devolver SOLO un JSON cuya RAÍZ sea un **array** (lista) de objetos.
-- Cada objeto DEBE tener EXACTAMENTE estas claves:
-  ["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]
-- Los campos numéricos ("Cantidad","PrecioUnitario","Subtotal") DEBEN ser números (no strings).
-- Mantener el orden natural de lectura de los ítems tal como aparecen en la factura.
-- Si un dato no es legible con certeza, usa null.
+Rol: Actúa como un Auditor de Costos y Control de Stock experto en Gastronomía.
 
-Mapeo de campos desde la factura/imagen:
-- "Codigo"   ← columna/etiqueta de ID o SKU (ej. "ECOM035", "ECOM107"). Si hay prefijos/ruido, toma el código limpio.
-- "Descripcion" ← descripción del producto (texto de ítem).
-- "Cantidad" ← cantidad comprada (unidades o kilos). No uses el campo "Unidad" para transformar el número.
-- "PrecioUnitario" ← precio por unidad (o por kilo). 
-- "Subtotal" ← total de la línea del ítem.
-- "UnidadMedida" ← por ejemplo "UNI", "KILOS", "CJ", etc. Si no está explícito, usa null.
+Contexto: Estás procesando "Remitos Valorizados" del proveedor "TUFUD / Ribs Al Río".
 
-Reglas de normalización (muy importantes):
-- No modifiques el contenido semántico del OCR, solo normalizá números para que sean válidos.
-- Interpreta formatos con separadores locales:
-  * "81.704,32" debe interpretarse como 81704.32  (coma decimal, punto de miles).
-  * "1.0" es 1.0.
-  * NO uses separadores de miles en la salida; solo punto decimal si hace falta.
-- Redondeos:
-  * "PrecioUnitario" y "Subtotal" redondeados a 2 decimales.
-  * "Cantidad" puede tener decimales si corresponde (ej. kilos).
-- Consistencia matemática:
-  * Asegurá SIEMPRE que Subtotal = Cantidad * PrecioUnitario (redondeando a 2 decimales).
-  * Si no podés leer con certeza "PrecioUnitario" pero sí "Cantidad" y "Subtotal",
-    podés derivar "PrecioUnitario" = Subtotal / Cantidad (2 decimales).
-  * Si no podés garantizar la relación, deja los campos dudosos en null y conserva lo legible.
+Objetivo: Digitalizar el detalle operativo del remito para calcular el Costo Unitario Final (Landing Cost), aplicando el IVA del 21% que no figura en el documento físico pero sí en el resumen fiscal.
 
-Pistas de producto para ubicar correctamente la descripción (ejemplos frecuentes de este proveedor):
-- Pan de Pebete, Baby Ribs Ahumado, Pulled Bites, Patitas de Pollo, Salsa Cheddar, Salsa BBQ Baby,
-  Ali oli / All Oli, Bbq Black, Salsa Coleslaw, Salsa de remolacha, Empanadas de Carne,
-  Recargo 15% por refuerzo, Queso Pategras, SAL DE HAMBURGUESA,
-  Mantel Grande (parafinado con logo), MEDALLON DE HAMBURGUESA,
-  Beef Ahumado (pulled), Spare Ribs Ahumadas, St. Louis ahumadas,
-  Salsa lomo / beef, Hummus, Pepinos encurtido seco, Locro, SALSA DE HAMBURGUESA,
-  Queso Crispy, Pan de papa, PAN CON SESAMO PARA HAMBURGUESA,
-  Panceta para hamburguesa, Lomo Ahumado (Porcionado), Sal de papas fritas,
-  Mantel Tetra 5%co, Tortilla de Maíz / Tortilla de Miel, Pulled Pork,
-  AROS DE CEBOLLA, Buzo para personal (S/M).
-- Estas referencias son solo guías para que ubiques la columna de descripción en caso de que el OCR desacomode columnas.
+FASE 1: EXTRACCIÓN Y REGLAS DE LECTURA
 
-Ejemplo de salida JSON (solo ilustrativo; no devuelvas comentarios ni texto fuera del JSON):
-[
-  {
-    "Codigo": "ECOM035",
-    "Descripcion": "Pan de Pebete",
-    "Cantidad": 40.0,
-    "PrecioUnitario": 1234.50,
-    "Subtotal": 49380.00,
-    "UnidadMedida": "UNI"
-  }
-]
+1. Fuente de Datos (Lectura de Imágenes):
+   - Lee las columnas explícitas del REMITO: "Categoría", "Producto", "Unidad", "Cantidad", "Total" (Este total es Neto).
 
-RESTRICCIONES CRÍTICAS:
-- No devuelvas CSV, ni markdown, ni texto adicional. SOLO el JSON pedido.
-- No agregues encabezados ni claves extra.
-- No inventes líneas que no estén en la factura.
-- Si un valor está ausente o ilegible, usa null.
+2. Parámetros Fiscales (Inyección de Reglas):
+   - Tasa IVA: Aplica 21.00% a todos los ítems (Regla General del Proveedor).
+   - Validación: La suma de los "Totales" extraídos debe coincidir con el Subtotal Neto esperado.
+
+FASE 2: LÓGICA DE NEGOCIO (PACK SIZE & COSTOS)
+
+Para cada línea, ejecuta esta secuencia estricta:
+
+Paso 1: Determinación del Pack Size (Ps) - Análisis Semántico
+Analiza las columnas "Unidad" y "Producto" para hallar la unidad mínima de consumo:
+   - Regla "Multiplicador": Si dice "x 24", "x 12", "x 50", "4 fetas", "5 porciones" -> Ps = N.
+     (Ej: "Tortilla... Bolsa x 24 unid" -> Ps = 24).
+   - Regla "Bolsa/Kilo Único": Si dice "Bolsa 1,980 kg", "1 Kilo", "500 gramos" sin desglose de unidades internas -> Ps = 1.
+   - Default: Si no hay indicador numérico claro, Ps = 1.
+
+Paso 2: Cálculos en Cascada
+   - Q Total (Insumos): Cantidad (Bultos) * Ps.
+   - Neto Línea: Valor extraído de columna "Total".
+   - IVA Calculado $: Neto Línea * 0.21.
+   - Total Final (Landing): Neto Línea + IVA Calculado.
+   - Costo Unitario Real: Total Final (Landing) / Q Total.
+
+FASE 3: VALIDACIÓN CRUZADA
+
+- Suma la columna "Total Neto" de todos los ítems.
+- Compara contra el Subtotal de Control proporcionado (si existe en el pie).
+- Tolerancia: +/- $1.00 (por redondeos).
+- Si coincide: ✅ OK. Si no: ❌ ERROR DE LECTURA.
+
+SALIDA FINAL
+
+Devolver un JSON con la estructura:
+{
+  "invoice_number": "<número de remito del encabezado>",
+  "invoice_total": <total de la factura incluyendo IVA>,
+  "items": [<lista de objetos con los campos de cada producto>]
+}
+
+Cada objeto en "items" debe tener las claves EXACTAS:
+["Categoria","Producto","Presentacion","Cant","Ps","Q","Total_Neto","IVA","Total_Final","Costo_Unit_Real"]
+
+IMPORTANTE:
+- Todos los valores numéricos deben usar punto como separador decimal (ej. 10000.50)
+- El IVA siempre es 21% (0.21)
+- Si un valor no se puede calcular o no existe, usar null
+- NO añadir texto fuera del JSON
+- Devolver ÚNICAMENTE el JSON (sin fences de código)
 """

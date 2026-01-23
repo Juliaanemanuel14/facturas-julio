@@ -1,9 +1,10 @@
 /**
- * Procesador de facturas de proveedores usando Azure Document Intelligence y Google Gemini AI
+ * Procesador de facturas de proveedores usando SOLO Google Gemini AI
+ * Optimizado para velocidad máxima
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getAzureConfig, getGeminiConfig, detectProviderType, PROMPTS, PROVIDER_TYPES, type ProviderType } from './proveedoresConfig';
+import { getGeminiConfig, detectProviderType, PROMPTS, PROVIDER_TYPES, type ProviderType } from './proveedoresConfig';
 
 // Definir tipos
 export interface InvoiceItem {
@@ -24,101 +25,51 @@ export interface ProcessedInvoice {
   error?: string;
 }
 
-/**
- * Extrae texto de una imagen usando Azure Document Intelligence
- */
-async function extractTextFromImageAzure(buffer: Buffer): Promise<string> {
-  // Solo importar si estamos en Node.js
-  const { DocumentAnalysisClient, AzureKeyCredential } = await import('@azure/ai-form-recognizer');
+// Cache para Gemini model
+let geminiModelInstance: any = null;
 
-  const { endpoint, key } = getAzureConfig();
-  const client = new DocumentAnalysisClient(endpoint, new AzureKeyCredential(key));
-
-  const poller = await client.beginAnalyzeDocument('prebuilt-layout', buffer);
-  const result = await poller.pollUntilDone();
-
-  // Extraer texto completo del documento
-  let fullText = result.content || '';
-
-  // Si no hay content, extraer de las líneas de cada página
-  if (!fullText && result.pages) {
-    fullText = result.pages
-      .map((page: any) =>
-        page.lines.map((line: any) => line.content).join('\n')
-      )
-      .join('\n\n');
+function getGeminiModel() {
+  if (!geminiModelInstance) {
+    const { apiKey, model } = getGeminiConfig();
+    const genAI = new GoogleGenerativeAI(apiKey);
+    geminiModelInstance = genAI.getGenerativeModel({ model });
   }
-
-  return fullText;
+  return geminiModelInstance;
 }
 
-/**
- * Extrae items de factura usando Azure Document Intelligence (modelo invoice)
- */
-async function extractItemsWithAzure(buffer: Buffer): Promise<InvoiceItem[]> {
-  const { DocumentAnalysisClient, AzureKeyCredential } = await import('@azure/ai-form-recognizer');
-
-  const { endpoint, key } = getAzureConfig();
-  const client = new DocumentAnalysisClient(endpoint, new AzureKeyCredential(key));
-
-  const poller = await client.beginAnalyzeDocument('prebuilt-invoice', buffer);
-  const result = await poller.pollUntilDone();
-
-  const items: InvoiceItem[] = [];
-
-  if (result.documents) {
-    for (const doc of result.documents) {
-      const itemsField = doc.fields?.Items as any;
-
-      if (itemsField && itemsField.values) {
-        for (const it of itemsField.values) {
-          const fields = it.properties || {};
-
-          const getFieldValue = (name: string): any => {
-            const field = fields[name];
-            return field?.content || field?.value || null;
-          };
-
-          const qty = parseFloat(getFieldValue('Quantity')) || null;
-          const unitPrice = parseFloat(getFieldValue('UnitPrice')) || null;
-          const amount = parseFloat(getFieldValue('Amount')) || null;
-          const subtotal = amount || (qty && unitPrice ? qty * unitPrice : null);
-
-          items.push({
-            Codigo: getFieldValue('ProductCode'),
-            Descripcion: getFieldValue('Description'),
-            Cantidad: qty,
-            PrecioUnitario: unitPrice,
-            Subtotal: subtotal,
-          });
-        }
-      }
-    }
-  }
-
-  return items;
-}
+// Mapa de prompts para acceso O(1)
+const PROMPT_MAP: Record<ProviderType, string> = {
+  [PROVIDER_TYPES.COCA_COLA]: PROMPTS.COCA_COLA,
+  [PROVIDER_TYPES.QUILMES]: PROMPTS.QUILMES,
+  [PROVIDER_TYPES.PENAFLOR]: PROMPTS.PENAFLOR,
+  [PROVIDER_TYPES.MAYORISTA_NET]: PROMPTS.MAYORISTA_NET,
+  [PROVIDER_TYPES.BLANCA_LUNA]: PROMPTS.BLANCA_LUNA,
+  [PROVIDER_TYPES.DEPOSITO_CENTRAL]: PROMPTS.DEPOSITO_CENTRAL,
+  [PROVIDER_TYPES.ENTRE_AMIGOS]: PROMPTS.ENTRE_AMIGOS,
+  [PROVIDER_TYPES.ARCUCCI]: PROMPTS.ARCUCCI,
+  [PROVIDER_TYPES.AJO]: PROMPTS.AJO,
+  [PROVIDER_TYPES.DBA]: PROMPTS.DBA,
+  [PROVIDER_TYPES.KUNZE]: PROMPTS.KUNZE,
+  [PROVIDER_TYPES.GENERAL]: PROMPTS.GENERAL,
+};
 
 /**
  * Procesa factura con Google Gemini AI
  */
 async function processWithGemini(
   buffer: Buffer,
-  fileName: string,
+  _fileName: string,
   mimeType: string,
-  extractedText?: string
+  extractedText?: string,
+  preDetectedProvider?: ProviderType
 ): Promise<{ provider: ProviderType; invoiceNumber?: string; invoiceTotal?: number; items: InvoiceItem[] }> {
-  const { apiKey, model } = getGeminiConfig();
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const geminiModel = genAI.getGenerativeModel({ model });
+  const geminiModel = getGeminiModel();
 
-  // Detectar tipo de proveedor si tenemos texto
-  const provider = extractedText ? detectProviderType(extractedText) : PROVIDER_TYPES.GENERAL;
+  // Usar proveedor pre-detectado o detectar del texto
+  const provider = preDetectedProvider || (extractedText ? detectProviderType(extractedText) : PROVIDER_TYPES.GENERAL);
 
-  // Obtener prompt apropiado
-  const prompt = provider === PROVIDER_TYPES.COCA_COLA ? PROMPTS.COCA_COLA :
-                 provider === PROVIDER_TYPES.QUILMES ? PROMPTS.QUILMES :
-                 PROMPTS.GENERAL;
+  // Obtener prompt apropiado (O(1) lookup)
+  const prompt = PROMPT_MAP[provider] || PROMPTS.GENERAL;
 
   let response;
 
@@ -178,102 +129,55 @@ async function processWithGemini(
 }
 
 /**
- * Procesa un archivo de factura (PDF o imagen)
+ * Detecta proveedor desde el nombre del archivo
+ */
+function detectProviderFromFileName(fileName: string): ProviderType {
+  const lower = fileName.toLowerCase();
+  if (lower.includes('quilmes') || lower.includes('cerveceria')) return PROVIDER_TYPES.QUILMES;
+  if (lower.includes('coca') || lower.includes('femsa')) return PROVIDER_TYPES.COCA_COLA;
+  if (lower.includes('peñaflor') || lower.includes('penaflor')) return PROVIDER_TYPES.PENAFLOR;
+  if (lower.includes('mayorista')) return PROVIDER_TYPES.MAYORISTA_NET;
+  if (lower.includes('blanca') || lower.includes('bidfood')) return PROVIDER_TYPES.BLANCA_LUNA;
+  if (lower.includes('central') || lower.includes('deposito')) return PROVIDER_TYPES.DEPOSITO_CENTRAL;
+  if (lower.includes('amigos') || lower.includes('frigorifico')) return PROVIDER_TYPES.ENTRE_AMIGOS;
+  if (lower.includes('arcucci') || lower.includes('moop')) return PROVIDER_TYPES.ARCUCCI;
+  if (lower.includes('ajo') || lower.includes('tufud')) return PROVIDER_TYPES.AJO;
+  if (lower.includes('dba')) return PROVIDER_TYPES.DBA;
+  if (lower.includes('kunze') || lower.includes('bier')) return PROVIDER_TYPES.KUNZE;
+  return PROVIDER_TYPES.GENERAL;
+}
+
+/**
+ * Procesa un archivo de factura (PDF o imagen) usando SOLO GEMINI
+ * Optimizado para velocidad máxima
  */
 export async function processProveedorInvoice(
   buffer: Buffer,
   fileName: string,
   mimeType: string
 ): Promise<ProcessedInvoice> {
+  const startTime = Date.now();
+
   try {
-    let result: ProcessedInvoice;
+    // Detectar proveedor desde nombre de archivo
+    const detectedProvider = detectProviderFromFileName(fileName);
 
-    // Detectar si es imagen o PDF
-    const isImage = mimeType.startsWith('image/');
-    const isPDF = mimeType === 'application/pdf';
+    // Procesar directamente con Gemini (hace OCR internamente para imágenes)
+    const geminiResult = await processWithGemini(buffer, fileName, mimeType, undefined, detectedProvider);
 
-    if (isImage) {
-      // Para imágenes, primero extraer texto con Azure para detectar proveedor
-      try {
-        const extractedText = await extractTextFromImageAzure(buffer);
-        const provider = detectProviderType(extractedText);
+    const result: ProcessedInvoice = {
+      fileName,
+      provider: geminiResult.provider,
+      invoiceNumber: geminiResult.invoiceNumber,
+      invoiceTotal: geminiResult.invoiceTotal,
+      items: geminiResult.items,
+    };
 
-        // Usar Gemini con la imagen y el proveedor detectado
-        const geminiResult = await processWithGemini(buffer, fileName, mimeType, extractedText);
-
-        result = {
-          fileName,
-          provider: provider, // Usar proveedor detectado de Azure
-          invoiceNumber: geminiResult.invoiceNumber,
-          invoiceTotal: geminiResult.invoiceTotal,
-          items: geminiResult.items,
-        };
-      } catch (azureError) {
-        console.warn('Azure OCR failed for image, using Gemini with generic prompt:', azureError);
-        // Si falla Azure, usar Gemini directamente
-        const geminiResult = await processWithGemini(buffer, fileName, mimeType);
-
-        result = {
-          fileName,
-          provider: geminiResult.provider,
-          invoiceNumber: geminiResult.invoiceNumber,
-          invoiceTotal: geminiResult.invoiceTotal,
-          items: geminiResult.items,
-        };
-      }
-    } else if (isPDF) {
-      // Para PDFs, primero intentar Azure Document Intelligence
-      try {
-        // Extraer texto del PDF con Azure
-        const extractedText = await extractTextFromImageAzure(buffer);
-
-        // Detectar proveedor
-        const provider = detectProviderType(extractedText);
-
-        // Si es proveedor específico, usar Gemini con el texto extraído
-        if (provider !== PROVIDER_TYPES.GENERAL) {
-          const geminiResult = await processWithGemini(buffer, fileName, mimeType, extractedText);
-
-          result = {
-            fileName,
-            provider: geminiResult.provider,
-            invoiceNumber: geminiResult.invoiceNumber,
-            invoiceTotal: geminiResult.invoiceTotal,
-            items: geminiResult.items,
-          };
-        } else {
-          // Para facturas generales, usar modelo de invoice de Azure
-          const azureItems = await extractItemsWithAzure(buffer);
-
-          result = {
-            fileName,
-            provider: PROVIDER_TYPES.GENERAL,
-            items: azureItems,
-          };
-        }
-      } catch (azureError) {
-        console.warn('Azure processing failed, falling back to Gemini:', azureError);
-
-        // Si falla Azure, intentar con Gemini
-        const extractedText = await extractTextFromImageAzure(buffer);
-        const geminiResult = await processWithGemini(buffer, fileName, mimeType, extractedText);
-
-        result = {
-          fileName,
-          provider: geminiResult.provider,
-          invoiceNumber: geminiResult.invoiceNumber,
-          invoiceTotal: geminiResult.invoiceTotal,
-          items: geminiResult.items,
-        };
-      }
-    } else {
-      throw new Error(`Formato de archivo no soportado: ${mimeType}`);
-    }
-
+    console.log(`✓ ${fileName} procesado en ${Date.now() - startTime}ms (${result.items.length} items)`);
     return result;
 
   } catch (error) {
-    console.error(`Error procesando ${fileName}:`, error);
+    console.error(`✗ Error procesando ${fileName}:`, error);
     return {
       fileName,
       provider: PROVIDER_TYPES.GENERAL,
@@ -281,4 +185,40 @@ export async function processProveedorInvoice(
       error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
+}
+
+/**
+ * Procesa múltiples archivos en paralelo con límite de concurrencia
+ * @param files Array de objetos con buffer, fileName y mimeType
+ * @param concurrencyLimit Número máximo de archivos procesados simultáneamente (default: 3)
+ */
+export async function processMultipleInvoices(
+  files: Array<{ buffer: Buffer; fileName: string; mimeType: string }>,
+  concurrencyLimit: number = 3
+): Promise<ProcessedInvoice[]> {
+  const startTime = Date.now();
+  console.log(`\n📦 Procesando ${files.length} archivos con concurrencia ${concurrencyLimit}...`);
+
+  const results: ProcessedInvoice[] = [];
+
+  // Procesar en lotes para respetar rate limits
+  for (let i = 0; i < files.length; i += concurrencyLimit) {
+    const batch = files.slice(i, i + concurrencyLimit);
+    const batchNum = Math.floor(i / concurrencyLimit) + 1;
+    const totalBatches = Math.ceil(files.length / concurrencyLimit);
+
+    console.log(`\n🔄 Lote ${batchNum}/${totalBatches} (${batch.length} archivos)`);
+
+    const batchResults = await Promise.all(
+      batch.map(file => processProveedorInvoice(file.buffer, file.fileName, file.mimeType))
+    );
+
+    results.push(...batchResults);
+  }
+
+  const totalTime = Date.now() - startTime;
+  const avgTime = Math.round(totalTime / files.length);
+  console.log(`\n✅ Completado: ${files.length} archivos en ${totalTime}ms (promedio: ${avgTime}ms/archivo)`);
+
+  return results;
 }

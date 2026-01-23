@@ -1,99 +1,86 @@
 # proveedores/arcucci.py
 # -*- coding: utf-8 -*-
-import pandas as pd
-from typing import List, Dict, Tuple
 
 PATTERNS = [
     r"(?i)\bARCUCCI\b",
+    r"(?i)\bMOOP\b",
+    r"(?i)ARCUCCI\s*MARCELO\s*ADRIAN",
     r"(?i)ARCUCCI\s*S\.?A\.?",
 ]
 
 PROMPT = """
-Proveedor: ARCUCCI (gastronómico).
+Prompt Maestro: Procesador MOOP / ARCUCCI (V. Refinada)
 
-Objetivo: devolver SOLO un JSON cuya RAÍZ sea una **lista** de objetos con las claves EXACTAS:
-["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]
+Rol: Auditor de Costos e Inventario.
 
-Reglas:
-- No inventes ítems; mantené el orden natural de lectura.
-- Números como números (no strings).
-- Si un dato no es legible con certeza, usar null.
-- Interpretación local: "81.704,32" => 81704.32 (coma decimal, punto de miles).
-- Redondeo a 2 decimales para PrecioUnitario y Subtotal cuando corresponda.
+Objetivo: Procesar comprobantes "X" de "ARCUCCI MARCELO ADRIAN" (MOOP), validando el descuento comercial línea por línea y calculando el costo unitario real de cada insumo.
 
-Mapeo y pistas (ARCUCCI):
-- "Codigo": números que aparecen antes de la descripción (sin separadores).
-- "Descripcion": artículos de limpieza/packaging, etc. No confundir con código.
-- "Cantidad": número después de la descripción (formato típico "3,00" => 3.00).
-- "PrecioUnitario": si no se ve, puede quedar null.
-- "Subtotal": total de la línea.
-- "UnidadMedida": si no aparece, podés dejar null (lo completamos luego).
+FASE 1: EXTRACCIÓN Y REGLAS DE NEGOCIO
+
+Trigger de Archivo
+Si el proveedor es "ARCUCCI" o "MOOP", aplica estrictamente estas reglas.
+
+Mapeo de Columnas (Lectura Explícita)
+- Cantidad: Columna "Cant.".
+- Descripción: Columna "Descripción".
+- Px Lista Base: Columna "Precio Uni." (Precio de lista antes del descuento).
+- % Desc: Columna "% Desc" (Crítico: suele ser 10.00 o similar).
+- Total Línea (Neto): Columna "Sub Total c/ IVA" (o "Sub Total").
+
+Datos de Control
+- TOTAL_FACTURA_REAL: El importe final del pie de página.
+- Impuestos: Al ser "Comprobantes X" o Presupuestos, asume IVA 0% y Percepciones $0.00, salvo que se discriminen explícitamente valores distintos de cero.
+
+FASE 2: CÁLCULOS ESTRUCTURALES (Lógica de Descuento y Ps)
+
+Para cada ítem, aplica este proceso secuencial:
+
+1. Determinación Inteligente del Pack Size (Ps):
+   Analiza la columna "Descripción" buscando el patrón de cantidad por bulto:
+
+   - Regla "X Cantidad": Busca al final del texto patrones como "X50", "X 50", "X100", "X 1000".
+     - Ejemplo: "BOLSA... X50 UNI" → Ps = 50.
+     - Ejemplo: "FILM... 38X1000" → Ps = 1000 (Asume metros o unidades si el número es alto).
+
+   - Regla de Exclusión de Dimensiones: No confundir medidas (ej: "90X120") con cantidad. La cantidad suele estar al final o seguida de "UNI"/"MTS".
+
+   - Regla de Líquidos/Unidad: Si dice "LITROS", "CC", "GALÓN" o "X UNIDAD", asume Ps = 1 (El costo deseado es por envase cerrado, no por mililitro).
+
+   - Default: Si no hay indicador claro, Ps = 1.
+
+2. Cálculo de Costos (Cascada):
+   - Total Bruto: Cantidad * Px Lista Base.
+   - Desc ($): Total Bruto * (% Desc / 100).
+   - Neto Calculado: Total Bruto - Desc ($).
+   - Final: Igual al Neto Calculado (por ser IVA 0%).
+
+3. Definición de Unitarios:
+   - Pack Final (Costo Bulto): Final / Cantidad.
+   - Unit Real (Costo Unitario): Pack Final / Ps.
+
+FASE 3: CIRCUITO DE VALIDACIÓN
+
+- Suma Vertical: Suma la columna "Final" de todos los ítems.
+- Comparación: Coteja contra TOTAL_FACTURA_REAL.
+- Tolerancia: Diferencia permitida < $1.00 (por redondeos de descuento).
+- Estado: Si difiere, marca "❌ ERROR DESC"; si coincide, "✅ OK".
+
+SALIDA FINAL
+
+Devolver un JSON con la estructura:
+{
+  "invoice_number": "<número de factura del encabezado>",
+  "invoice_total": <total de la factura>,
+  "items": [<lista de objetos con los campos de cada producto>]
+}
+
+Cada objeto en "items" debe tener las claves EXACTAS:
+["Fecha","Num_de_FC","Producto","Cant","Ps","Px_Lista_Base","Porc_Desc","Total_Bruto","Desc","Neto_Final","Pack_Final","Unit_Real"]
+
+IMPORTANTE:
+- Todos los valores numéricos deben usar punto como separador decimal (ej. 10000.50)
+- Los porcentajes deben ser decimales (ej. 0.10 para 10%)
+- Si un valor no se puede calcular o no existe, usar null
+- NO añadir texto fuera del JSON
+- Devolver ÚNICAMENTE el JSON (sin fences de código)
 """
-
-def _to_float_local(x):
-    if x is None: return None
-    if isinstance(x, (int, float)): return float(x)
-    s = str(x).strip()
-    if "," in s:
-        s = s.replace(".", "").replace(",", ".")
-    return float(s) if s else None
-
-def transform_azure(items: List[Dict]) -> List[Dict]:
-    """
-    Normaliza SIEMPRE lo que venga de Azure para ARCUCCI:
-      - UnidadMedida por defecto 'UNI' si viene vacía.
-      - PrecioUnitario := Subtotal / Cantidad (si qty>0 y hay subtotal), aunque ya exista.
-      - Subtotal := Cantidad * PrecioUnitario (redondeado a 2).
-    """
-
-    def _to_float_local(x):
-        if x is None: return None
-        if isinstance(x, (int, float)): return float(x)
-        s = str(x).strip()
-        if "," in s:
-            s = s.replace(".", "").replace(",", ".")
-        return float(s) if s else None
-
-    df = pd.DataFrame(items)
-    for col in ["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]:
-        if col not in df.columns:
-            df[col] = None
-
-    # Unidad por defecto
-    df["UnidadMedida"] = df["UnidadMedida"].apply(lambda x: x if x not in (None, "", " ") else "UNI")
-
-    qty  = df["Cantidad"].apply(_to_float_local)
-    sub  = df["Subtotal"].apply(_to_float_local)
-
-    # SIEMPRE recalcular PrecioUnitario cuando hay datos suficientes
-    mask = qty.notna() & sub.notna() & (qty > 0)
-    df.loc[mask, "PrecioUnitario"] = (sub[mask] / qty[mask]).round(2)
-
-    # Recalcular Subtotal con el nuevo precio para asegurar consistencia
-    price = df["PrecioUnitario"].apply(_to_float_local)
-    mask2 = qty.notna() & price.notna()
-    df.loc[mask2, "Subtotal"] = (qty[mask2] * price[mask2]).round(2)
-
-    return df.to_dict(orient="records")
-
-
-# --- 3) Transformación post-Gemini ---
-def transform_items(items: List[Dict]) -> List[Dict]:
-    """
-    Post-Gemini: fijar PrecioUnitario = Subtotal / Cantidad (si aplica) y Unidad='UNI' si falta.
-    """
-    df = pd.DataFrame(items)
-    for col in ["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]:
-        if col not in df.columns:
-            df[col] = None
-
-    qty  = df["Cantidad"].apply(_to_float_local)
-    sub  = df["Subtotal"].apply(_to_float_local)
-
-    mask = qty.notna() & sub.notna() & (qty > 0)
-    df.loc[mask, "PrecioUnitario"] = (sub[mask] / qty[mask]).round(2)
-    df.loc[mask, "Subtotal"] = (qty[mask] * df.loc[mask, "PrecioUnitario"]).round(2)
-
-    df["UnidadMedida"] = df["UnidadMedida"].apply(lambda x: x if x else "UNI")
-
-    return df.to_dict(orient="records")

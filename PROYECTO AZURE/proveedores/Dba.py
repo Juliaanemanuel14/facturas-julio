@@ -1,36 +1,73 @@
-# proveedores/distribuidoras_dba.py
+# proveedores/dba.py
 # -*- coding: utf-8 -*-
 
 PATTERNS = [
     r"(?i)\bDBA\b",
     r"(?i)\bD\.?B\.?A\.?\b",
-    r"(?i)\bDISTRIBUIDORAS?\s+DBA\b",
+    r"(?i)\bDISTRIBUIDORA\s+DE\s+BEBIDAS\b",
+    r"(?i)\bDISTRIBUIDORA\s+DE\s+BEBIDAS\s+SRL\b",
 ]
 
 PROMPT = """
-Proveedor: DISTRIBUIDORAS DBA (gastronómico).
+Prompt Maestro: Procesador DBA (Desglose Impositivo Detallado)
 
-Objetivo: devolver SOLO un JSON cuya RAÍZ sea una **lista** de objetos con las claves EXACTAS:
-["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]
+Rol: Actúa como un Analista de Costos y Auditor Fiscal.
 
-Reglas generales:
-- No inventes ítems; mantené el orden natural de lectura.
-- Números como números (no strings).
-- Si un dato no es legible con certeza, usar null.
-- Interpretación local: "81.704,32" => 81704.32 (coma decimal, punto de miles).
-- Sin separadores de miles en la salida numérica.
-- Redondeo a 2 decimales para PrecioUnitario y Subtotal cuando corresponda.
-- NO agregar texto fuera del JSON (sin encabezados, comentarios ni fences).
+Contexto: Estás procesando facturas de "Distribuidora de Bebidas SRL" (DBA).
 
-Mapeo específico (DISTRIBUIDORAS DBA):
-- "Codigo": el comprobante **no muestra código** → usar 0 en todas las líneas.
-- "Descripcion": columna **Descripción** (segunda columna).
-- "Cantidad": columna **Cantidad** (primera columna). Debe ser solo número.
-- "PrecioUnitario": columna **Precio s/Impuestos** (sexta columna del ítem).
-- "Subtotal": columna **Subtotal** del renglón.
-- "UnidadMedida": si no se indica, dejar null.
+Problema: Este proveedor lista los productos en valor NETO y agrupa todos los impuestos (IVA, Internos, Percepciones) en el pie de página.
 
-Notas:
-- El campo "Cliente:" u otros metadatos NO forman parte del JSON pedido aquí.
-- La salida debe ser únicamente el JSON con las claves EXACTAS indicadas.
+Objetivo: Prorratear la carga impositiva línea por línea para diferenciar el IVA (Crédito Fiscal) del Costo Real (Neto + Impuestos Internos + Percepciones).
+
+FASE 1: LECTURA DEL PIE DE PÁGINA (CONTROL)
+
+Extrae los valores totales para calcular las alícuotas reales de esta factura:
+- SUBTOTAL_NETO: La base imponible (Suma de los netos).
+- TOTAL_IVA: El monto total de IVA (Generalmente 21%).
+- TOTAL_OTROS_IMP: Suma manual de: Impuestos Internos + Percep. IVA + Percep. IIBB.
+- TOTAL_FACTURA: El importe final a pagar.
+
+FASE 2: CÁLCULO DE COEFICIENTES (MATEMÁTICA)
+
+Calcula los factores de prorrateo dividiendo los impuestos sobre el neto base:
+- Coef_IVA: TOTAL_IVA / SUBTOTAL_NETO (Debe dar ≈ 0.21).
+- Coef_OTROS: TOTAL_OTROS_IMP / SUBTOTAL_NETO (Este es el peso de imp. internos y percepciones).
+- Coef_FINAL: TOTAL_FACTURA / SUBTOTAL_NETO (Factor total para validación).
+
+FASE 3: PROCESAMIENTO DE ÍTEMS
+
+Recorre la lista de productos y extrae: Descripción, Cantidad y Total Línea (Neto).
+
+Nota: Si la línea tiene valor $0 (Bonificación), respétalo como $0.
+
+Para cada ítem, aplica las fórmulas:
+- Neto Unitario: Total Línea / Cantidad.
+- IVA $: Neto Unitario * Coef_IVA.
+- Otros Imp $: Neto Unitario * Coef_OTROS.
+- Costo Unitario Final: Neto Unitario + IVA $ + Otros Imp $.
+
+FASE 4: VALIDACIÓN CRUZADA
+
+Suma el Costo Unitario Final multiplicado por la Cantidad de todos los ítems.
+Compara esa suma contra el TOTAL_FACTURA.
+Si la diferencia es menor a $5 pesos, el análisis es CORRECTO.
+
+SALIDA FINAL
+
+Devolver un JSON con la estructura:
+{
+  "invoice_number": "<número de factura del encabezado>",
+  "invoice_total": <total de la factura>,
+  "items": [<lista de objetos con los campos de cada producto>]
+}
+
+Cada objeto en "items" debe tener las claves EXACTAS:
+["Producto","Cant","Neto_Unitario","IVA","Otros_Imp","Costo_Final_Unit"]
+
+IMPORTANTE:
+- Todos los valores numéricos deben usar punto como separador decimal (ej. 10000.50)
+- Si la línea tiene valor $0 (bonificación), todos los costos deben ser 0
+- Si un valor no se puede calcular o no existe, usar null
+- NO añadir texto fuera del JSON
+- Devolver ÚNICAMENTE el JSON (sin fences de código)
 """

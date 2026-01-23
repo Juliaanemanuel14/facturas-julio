@@ -9,36 +9,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { username, password } = req.body;
 
-  // Obtener credenciales de variables de entorno
+  // TEMPORAL: Sin validación de contraseña para desarrollo
   const validUsername = process.env.AUTH_USERNAME || 'admin';
-  // Fallback para desarrollo local si no se lee la variable de entorno
-  const validPasswordHash = process.env.AUTH_PASSWORD_HASH || '$2b$10$bQOzYjD/B6S93woCCUnw0uTu69ntKR1V8JQKXeE/Ufq6RH9xz2xYm';
 
-  // Validar credenciales
+  // Validar solo el usuario (sin contraseña temporalmente)
   if (username === validUsername) {
-    const isValid = await bcrypt.compare(password, validPasswordHash);
+    // Crear token de sesión simple (en producción usar JWT)
+    const sessionToken = Buffer.from(
+      JSON.stringify({
+        username,
+        timestamp: Date.now(),
+      })
+    ).toString('base64');
 
-    if (isValid) {
-      // Crear token de sesión simple (en producción usar JWT)
-      const sessionToken = Buffer.from(
-        JSON.stringify({
-          username,
-          timestamp: Date.now(),
-        })
-      ).toString('base64');
+    // Configurar cookie de sesión
+    const cookie = serialize('session', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+      path: '/',
+    });
 
-      // Configurar cookie de sesión
-      const cookie = serialize('session', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 24 * 7, // 7 días
-        path: '/',
-      });
-
-      res.setHeader('Set-Cookie', cookie);
-      return res.status(200).json({ success: true, message: 'Login successful' });
-    }
+    res.setHeader('Set-Cookie', cookie);
+    return res.status(200).json({ success: true, message: 'Login successful' });
   }
 
   // Credenciales inválidas

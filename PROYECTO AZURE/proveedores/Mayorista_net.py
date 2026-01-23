@@ -3,28 +3,69 @@
 
 PATTERNS = [
     r"(?i)\bMAYORISTA\s+NET\b",
+    r"(?i)\bMAYORISTANET\b",
     r"(?i)\bMAYORISTA\s+NET\s*S\.?A\.?\b",
+    r"(?i)\bMAYORISTANET\.COM\b",
 ]
 
 PROMPT = """
-Proveedor: MAYORISTA NET (gastronómico).
+Proveedor: MAYORISTANET.COM S.A.
 
-Objetivo: devolver SOLO un JSON cuya RAÍZ sea una **lista** de objetos con las claves EXACTAS:
-["Codigo","Descripcion","Cantidad","PrecioUnitario","Subtotal","UnidadMedida"]
+Rol: Actúa como un Auditor de Costos y Fiscal.
 
-Reglas generales:
-- No inventes ítems; mantené el orden natural de lectura.
-- Números como números (no strings).
-- Si un dato no es legible con certeza, usar null.
-- Interpretación local: coma decimal y punto de miles (ej.: "5.142,00" => 5142.00).
-- Sin separadores de miles en la salida numérica.
-- Redondeo a 2 decimales para PrecioUnitario y Subtotal cuando corresponda.
-- La salida debe ser **solo** el JSON, sin texto adicional ni encabezados.
+Objetivo: Digitalizar facturas de "MAYORISTANET.COM S.A.", desglosando la estructura impositiva línea por línea para llegar al Costo Unitario Final (Landing Cost) real.
 
-Mapeo y pistas (MAYORISTA NET):
-- "Codigo": código del artículo del proveedor. Formatos típicos alfanuméricos: F00098, F00516, A00645, A00801, G00498 (si no está claro, dejar null).
-- "Descripcion": campo **Descripción** del producto (limpia, sin notas como “Oferta” si aparecen fuera del nombre).
-- "Cantidad": priorizar **Cant.KG** si aparece en la misma línea; si no existe, usar **CANT.Uni**. Ambas aparecen luego de la descripción. Normalizar separador decimal a punto.
-- "PrecioUnitario": tomar el precio unitario real del ítem. El precio **nunca** puede ser 0, 21,00 ni 10,50 (esos corresponden a IVA u otros impuestos). Si un campo está vacío, buscar el correcto en la línea del ítem.
-- "Subtotal": corresponde a **Total** del renglón. En valores como "30.772.55" (múltiples puntos sin coma), interpretar como miles + 2 decimales finales → 30772.55. E
+FASE 1: EXTRACCIÓN Y REGLAS DE LECTURA
+
+Datos de Cabecera/Pie:
+- IIBB Tasa: Busca en el pie de página la tasa de "Perc IIBB" (Ej: 3.00%).
+- TOTAL_COMPROBANTE: El importe final a pagar.
+
+Lectura de Ítems (Columnas Explícitas):
+- Descripción: Nombre del producto.
+- Cant: Cantidad de bultos facturados.
+- Total Neto: El subtotal de la línea.
+- Tasa IVA: Lee explícitamente la columna "Tasa IVA" (21.00 o 10.50).
+
+FASE 2: LÓGICA DE CÁLCULO (CASCADA)
+
+Para cada ítem, aplica este orden estricto:
+
+1. Determinación del Stock (Regla del Pack Size ≤ 12):
+   - Analiza la descripción. Busca patrones numéricos "N x..." o "...x N".
+   - Si N ≤ 12: Ps = N. (Es venta de unidades agrupadas).
+   - Si N > 12 o no hay patrón: Ps = 1. (Es venta a granel/bulto cerrado).
+   - Fórmula: Q_Total = Cant * Ps.
+
+2. Estructura Impositiva:
+   - IVA $: Total Neto * (Tasa IVA / 100).
+   - IIBB $: Total Neto * (Tasa IIBB Pie / 100). Nota: Si no hay tasa explícita, usa 0.
+   - Total Final (Landing): Total Neto + IVA $ + IIBB $.
+
+3. Definición de Costos:
+   - Unitario Final: Total Final (Landing) / Q_Total.
+
+FASE 3: VALIDACIÓN
+
+Suma la columna "Total Final (Landing)" de todos los ítems.
+Compara contra "TOTAL_COMPROBANTE".
+Si la diferencia es < $10, marca "✅ OK".
+
+SALIDA FINAL
+Devolver un JSON con la estructura:
+{
+  "invoice_number": "<número de factura del encabezado>",
+  "invoice_total": <total de la factura>,
+  "items": [<lista de objetos con los campos de cada producto>]
+}
+
+Cada objeto en "items" debe tener las claves EXACTAS:
+["Producto","Cant","Ps","Q","Total_Neto","Porc_IVA","IVA","IIBB","Total_Final","Unitario_Final"]
+
+IMPORTANTE:
+- Todos los valores numéricos deben usar punto como separador decimal (ej. 10000.50)
+- Los porcentajes deben ser decimales (ej. 0.21 para 21%)
+- Si un valor no se puede calcular o no existe, usar null
+- NO añadir texto fuera del JSON
+- Devolver ÚNICAMENTE el JSON (sin fences de código)
 """
