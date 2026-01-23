@@ -70,11 +70,6 @@ export default function Home() {
     setIsProcessing(true);
     setProcessedCount(0);
 
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-
     // Todos los tipos usan descarga directa
     const apiEndpoint = selectedType === 'facturas' ? '/api/process-pdfs' :
                         selectedType === 'liquidaciones' ? '/api/process-liquidations' :
@@ -88,24 +83,82 @@ export default function Home() {
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        body: formData,
-      });
+      // Para proveedores, procesar en lotes de 3 archivos para evitar error 413
+      if (selectedType === 'proveedores' && files.length > 3) {
+        const BATCH_SIZE = 3;
+        const allResults: any[] = [];
 
-      if (!response.ok) {
-        throw new Error('Error processing files');
+        for (let i = 0; i < files.length; i += BATCH_SIZE) {
+          const batch = files.slice(i, i + BATCH_SIZE);
+          const formData = new FormData();
+          batch.forEach((file) => {
+            formData.append('files', file);
+          });
+
+          // Usar endpoint de análisis que devuelve JSON
+          const response = await fetch('/api/analyze-proveedores', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error en lote ${Math.floor(i / BATCH_SIZE) + 1}`);
+          }
+
+          const data = await response.json();
+          if (data.invoices) {
+            allResults.push(...data.invoices);
+          }
+
+          setProcessedCount(Math.min(i + BATCH_SIZE, files.length));
+        }
+
+        // Generar Excel con todos los resultados
+        const excelResponse = await fetch('/api/generate-proveedores-excel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoices: allResults }),
+        });
+
+        if (!excelResponse.ok) {
+          throw new Error('Error generando Excel');
+        }
+
+        const blob = await excelResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Para otros tipos o pocos archivos, enviar todo junto
+        const formData = new FormData();
+        files.forEach((file) => {
+          formData.append('files', file);
+        });
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Error processing files');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = downloadFilename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
 
       setProcessedCount(files.length);
       setTimeout(() => {
