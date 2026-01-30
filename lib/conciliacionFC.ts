@@ -160,8 +160,8 @@ export function procesarOppen(rows: any[]): any[] {
 
     // Parsear fecha de factura (para ID3 - matching con ARCA)
     let fechaFactura: Date | null = null;
-    if (row['Fecha de Factura']) {
-      fechaFactura = new Date(row['Fecha de Factura']);
+    if (row['Fecha Factura']) {
+      fechaFactura = new Date(row['Fecha Factura']);
       if (isNaN(fechaFactura.getTime())) fechaFactura = null;
     }
 
