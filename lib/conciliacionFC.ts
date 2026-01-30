@@ -158,11 +158,11 @@ export function procesarOppen(rows: any[]): any[] {
     const totalFactura = Number(row['Total Factura']) || 0;
     const monto = Math.round(totalFactura);
 
-    // Parsear fecha
-    let fechaVto: Date | null = null;
-    if (row['Fecha Vto.']) {
-      fechaVto = new Date(row['Fecha Vto.']);
-      if (isNaN(fechaVto.getTime())) fechaVto = null;
+    // Parsear fecha de factura (para ID3 - matching con ARCA)
+    let fechaFactura: Date | null = null;
+    if (row['Fecha de Factura']) {
+      fechaFactura = new Date(row['Fecha de Factura']);
+      if (isNaN(fechaFactura.getTime())) fechaFactura = null;
     }
 
     // Generar IDs (exactamente como en app.py)
@@ -170,7 +170,7 @@ export function procesarOppen(rows: any[]): any[] {
     const pvStr = pv.replace(/nan/gi, '');
     const numStr = num.replace(/nan/gi, '');
     const sociedadStr = String(sociedad).replace(/nan/gi, '');
-    const fechaSerial = fechaAExcelSerial(fechaVto);
+    const fechaSerial = fechaAExcelSerial(fechaFactura);
 
     const id1 = pvStr + numStr + montoStr;
     const id2 = id1 + sociedadStr;
@@ -182,7 +182,6 @@ export function procesarOppen(rows: any[]): any[] {
       Num: num,
       Sociedades: sociedad,
       Monto: monto,
-      'Fecha Vto.': fechaVto,
       ID1: id1,
       ID2: id2,
       ID3: id3,
