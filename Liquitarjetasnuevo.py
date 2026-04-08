@@ -60,6 +60,7 @@ def extraer_campos_verticales(pdf_path):
         return "No encontrado"
 
     resultados["IVA 21.00%"] = extraer_valor_monetario(r'IVA\s*21,?00\s*%?\s*\$\s*([\d.,]+)', texto_completo)
+    resultados["Ret.IB SIRTAC"] = extraer_valor_monetario(r'Ret\.?IB\s*SIRTAC\s*[\d.,]*\s*%?\s*\$\s*([\d.,]+)', texto_completo)
     resultados["Ret.IB CAP. FED."] = extraer_valor_monetario(r'Ret.IB CAP.FED.\s*[\d.,]+\s*%?\s*\$\s*([\d.,]+)', texto_completo)
     resultados["Percep. AFIP"] = extraer_valor_monetario(r'Percep./Retenc.AFIP\s*[-]?\s*DGI\s*\$\s*([\d.,]+)', texto_completo)
 
@@ -100,14 +101,15 @@ def extraer_campos_verticales(pdf_path):
         "SALDO $": "Saldo",
         "TOTAL PRESENTADO $": "Total Presentado",
         "IVA 21.00%": "IVA",
-        "Ret.IB CAP. FED.": "Retención IB",
+        "Ret.IB SIRTAC": "Retención IB SIRTAC",
+        "Ret.IB CAP. FED.": "Retención IB CAP.FED.",
         "Percep. AFIP": "Percepción AFIP"
     }
 
     return {mapeo_nombres.get(k, k): v for k, v in resultados.items()}
 
 # Ruta a la carpeta de PDFs
-carpeta_pdfs = r"C:\Users\gesti\OneDrive\Escritorio\Liquidaciones 062025"
+carpeta_pdfs = r"C:\Users\gesti\Downloads\PAYWAY COMISIONES TARJETAS MARZO 2026\PAYWAY COMISIONES TJT MARZO 2026"
 archivo_csv = "resultados_extracionn.csv"
 
 campos_csv = [
@@ -120,7 +122,8 @@ campos_csv = [
     "Total Descuento",
     "Saldo",
     "IVA",
-    "Retención IB",
+    "Retención IB SIRTAC",
+    "Retención IB CAP.FED.",
     "Percepción AFIP",
     "Logo VISA",
     "Texto OCR Bruto",
@@ -148,4 +151,4 @@ with open(archivo_csv, mode='w', newline='', encoding='utf-8') as csv_file:
                 fila_error["Archivo PDF"] = archivo
                 writer.writerow(fila_error)
 
-print(f"\n✅ Proceso completado. Resultados guardados en: {archivo_csv}")
+print(f"\nProceso completado. Resultados guardados en: {archivo_csv}")

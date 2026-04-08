@@ -55,6 +55,10 @@ export default function Home() {
                  file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
                  file.type === 'application/vnd.ms-excel';
         }
+        if (selectedType === 'liquidaciones') {
+          return file.type === 'application/pdf' || file.name.endsWith('.zip') ||
+                 file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+        }
         return file.type === 'application/pdf';
       }
     );
@@ -713,7 +717,7 @@ export default function Home() {
                     id="fileInput"
                     type="file"
                     multiple
-                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : '.pdf'}
+                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : '.pdf'}
                     onChange={handleFileInput}
                     className="hidden"
                   />
@@ -736,7 +740,7 @@ export default function Home() {
                     </div>
 
                     <h3 className="text-2xl font-semibold mb-2">
-                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : 'PDF'} aquí
+                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : 'PDF'} aquí
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-4">
                       o haz clic para seleccionarlos

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { File } from 'formidable';
 import fs from 'fs';
+import unzipper from 'unzipper';
 import { processCardLiquidation } from '@/lib/cardLiquidationProcessor';
 import { generateCardLiquidationExcel } from '@/lib/cardLiquidationExcel';
 
@@ -11,6 +12,21 @@ export const config = {
   },
 };
 
+async function extractPdfsFromZip(zipPath: string): Promise<{ buffer: Buffer; filename: string }[]> {
+  const pdfs: { buffer: Buffer; filename: string }[] = [];
+  const directory = await unzipper.Open.file(zipPath);
+
+  for (const file of directory.files) {
+    if (file.path.toLowerCase().endsWith('.pdf') && file.type === 'File') {
+      const buffer = await file.buffer();
+      const filename = file.path.split('/').pop() || 'unknown.pdf';
+      pdfs.push({ buffer, filename });
+    }
+  }
+
+  return pdfs;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -19,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const form = formidable({
       multiples: true,
-      maxFileSize: 50 * 1024 * 1024,
+      maxFileSize: 200 * 1024 * 1024,
       keepExtensions: true,
     });
 
@@ -30,25 +46,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     });
 
-    const pdfFiles = Array.isArray(files.files) ? files.files : files.files ? [files.files] : [];
-    const validPdfFiles = pdfFiles.filter((file): file is File => file !== null && file !== undefined);
+    const uploadedFiles = Array.isArray(files.files) ? files.files : files.files ? [files.files] : [];
+    const validFiles = uploadedFiles.filter((file): file is File => file !== null && file !== undefined);
 
-    if (validPdfFiles.length === 0) {
-      return res.status(400).json({ error: 'No PDF files uploaded' });
+    if (validFiles.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
     }
 
     const results = [];
 
-    for (const file of validPdfFiles) {
-      const buffer = fs.readFileSync(file.filepath);
-      const data = await processCardLiquidation(buffer, file.originalFilename || 'unknown.pdf');
-      results.push(data);
+    for (const file of validFiles) {
+      const originalName = (file.originalFilename || '').toLowerCase();
+
+      if (originalName.endsWith('.zip')) {
+        // Extraer PDFs del ZIP y procesarlos
+        const pdfsFromZip = await extractPdfsFromZip(file.filepath);
+
+        for (const pdf of pdfsFromZip) {
+          const data = await processCardLiquidation(pdf.buffer, pdf.filename);
+          results.push(data);
+        }
+      } else if (originalName.endsWith('.pdf')) {
+        const buffer = fs.readFileSync(file.filepath);
+        const data = await processCardLiquidation(buffer, file.originalFilename || 'unknown.pdf');
+        results.push(data);
+      }
 
       try {
         fs.unlinkSync(file.filepath);
       } catch (e) {
         console.warn('Could not delete temp file:', e);
       }
+    }
+
+    if (results.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron archivos PDF para procesar' });
     }
 
     const excelBuffer = await generateCardLiquidationExcel(results);
