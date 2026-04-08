@@ -137,8 +137,58 @@ export default function Home() {
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
+      // Para liquidaciones, procesar en lotes de 5 archivos para evitar error 413
+      if (selectedType === 'liquidaciones' && files.length > 5) {
+        const BATCH_SIZE = 5;
+        const allResults: any[] = [];
+
+        for (let i = 0; i < files.length; i += BATCH_SIZE) {
+          const batch = files.slice(i, i + BATCH_SIZE);
+          const formData = new FormData();
+          batch.forEach((file) => {
+            formData.append('files', file);
+          });
+
+          const response = await fetch('/api/analyze-liquidations', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error en lote ${Math.floor(i / BATCH_SIZE) + 1}`);
+          }
+
+          const data = await response.json();
+          if (data.liquidations) {
+            allResults.push(...data.liquidations);
+          }
+
+          setProcessedCount(Math.min(i + BATCH_SIZE, files.length));
+        }
+
+        // Generar Excel con todos los resultados
+        const excelResponse = await fetch('/api/generate-liquidations-excel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ liquidations: allResults }),
+        });
+
+        if (!excelResponse.ok) {
+          throw new Error('Error generando Excel');
+        }
+
+        const blob = await excelResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
       // Para proveedores, procesar en lotes de 3 archivos para evitar error 413
-      if (selectedType === 'proveedores' && files.length > 3) {
+      else if (selectedType === 'proveedores' && files.length > 3) {
         const BATCH_SIZE = 3;
         const allResults: any[] = [];
 
