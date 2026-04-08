@@ -88,21 +88,40 @@ function extractMonetaryValue(pattern: RegExp, text: string): string {
   return '0.00';
 }
 
-function detectCardBrand(text: string): string {
-  const textUpper = text.toUpperCase();
+function detectCardBrand(text: string, filename: string): string {
+  // Combinar texto del PDF + nombre del archivo para más chances de detección
+  const combined = (text + ' ' + filename).toUpperCase();
 
+  // Orden importa: buscar las más específicas primero para evitar falsos positivos
+  // (ej: "VISA" podría aparecer en texto genérico)
   const brands = [
-    { name: 'VISA', patterns: ['VISA'] },
-    { name: 'MASTERCARD', patterns: ['MASTERCARD', 'MASTER CARD'] },
+    { name: 'AMERICAN EXPRESS', patterns: ['AMERICAN EXPRESS', 'AMEX', 'AMERICANEXPRESS'] },
+    { name: 'MASTERCARD', patterns: ['MASTERCARD', 'MASTER CARD', 'MASTER'] },
     { name: 'CABAL', patterns: ['CABAL'] },
-    { name: 'AMERICAN EXPRESS', patterns: ['AMERICAN EXPRESS', 'AMEX'] }
+    { name: 'VISA', patterns: ['VISA'] },
+    { name: 'NARANJA', patterns: ['NARANJA'] },
+    { name: 'MAESTRO', patterns: ['MAESTRO'] },
   ];
 
   for (const brand of brands) {
     for (const pattern of brand.patterns) {
-      if (textUpper.includes(pattern)) {
+      // Buscar como palabra completa para evitar falsos positivos
+      const regex = new RegExp('\\b' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+      if (regex.test(combined)) {
         return brand.name;
       }
+    }
+  }
+
+  // Fallback: buscar en el número de establecimiento o códigos conocidos
+  // Visa suele tener código que empieza con 4, Master con 5, etc.
+  // También buscar patrones de liquidación típicos
+  if (/PRISMA\s*MEDIOS\s*DE\s*PAGO/i.test(text) || /PAYWAY/i.test(text)) {
+    // Es una liquidación de Prisma/Payway pero no se identificó la marca
+    // Intentar por el tipo de comprobante o número
+    if (/MEN/i.test(filename)) {
+      // MEN es un código común en comprobantes, no indica marca por sí solo
+      return 'No reconocido (Prisma/Payway)';
     }
   }
 
@@ -200,7 +219,7 @@ export async function processCardLiquidation(buffer: Buffer, filename: string): 
   );
 
   // Detectar marca de tarjeta
-  liquidationData.Logo_Marca = detectCardBrand(text);
+  liquidationData.Logo_Marca = detectCardBrand(text, filename);
 
   return liquidationData;
 }
