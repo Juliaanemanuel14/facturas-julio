@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos';
 
 export default function Home() {
   const router = useRouter();
@@ -58,6 +58,10 @@ export default function Home() {
         if (selectedType === 'liquidaciones') {
           return file.type === 'application/pdf' || file.name.endsWith('.zip') ||
                  file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+        }
+        if (selectedType === 'extractos') {
+          const lname = file.name.toLowerCase();
+          return lname.endsWith('.csv') || lname.endsWith('.xls') || lname.endsWith('.xlsx');
         }
         return file.type === 'application/pdf';
       }
@@ -128,12 +132,14 @@ export default function Home() {
                         selectedType === 'ddjj' ? '/api/process-ddjj' :
                         selectedType === 'proveedores' ? '/api/process-proveedores' :
                         selectedType === 'conciliacion' ? '/api/conciliacion-fc' :
+                        selectedType === 'extractos' ? '/api/process-extractos' :
                         '/api/process-arca';
     const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
                              selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
                              selectedType === 'ddjj' ? 'ddjj_iva.xlsx' :
                              selectedType === 'proveedores' ? 'facturas_proveedores.xlsx' :
                              selectedType === 'conciliacion' ? 'Conciliacion_Final_Analizada.xlsx' :
+                             selectedType === 'extractos' ? 'extractos_bancarios_consolidado.xlsx' :
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
@@ -361,7 +367,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-7 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -583,12 +589,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('extractos')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-indigo-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-violet-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h18M3 6h18M3 14h18M3 18h18"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Extractos Bancarios
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Consolida extractos de múltiples bancos
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Ciudad, Galicia, Santander</p>
+                  <p>✓ Provincia y Nación</p>
+                  <p>✓ Detección automática</p>
+                  <p>✓ Razón social desde nombre</p>
+                  <p>✓ CSV, XLS y XLSX</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : selectedType === 'extractos' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -620,7 +663,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : selectedType === 'extractos' ? 'Extractos Bancarios' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -767,7 +810,7 @@ export default function Home() {
                     id="fileInput"
                     type="file"
                     multiple
-                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : '.pdf'}
+                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : selectedType === 'extractos' ? '.csv,.xls,.xlsx' : '.pdf'}
                     onChange={handleFileInput}
                     className="hidden"
                   />
@@ -790,7 +833,7 @@ export default function Home() {
                     </div>
 
                     <h3 className="text-2xl font-semibold mb-2">
-                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : 'PDF'} aquí
+                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : selectedType === 'extractos' ? 'CSV, XLS o XLSX de extractos' : 'PDF'} aquí
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-4">
                       o haz clic para seleccionarlos
