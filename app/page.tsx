@@ -16,6 +16,21 @@ interface ExtractoRow {
   'Saldo': number;
 }
 
+interface PaywayRow {
+  'RAZON SOCIAL': string;
+  'LOCAL': string;
+  'FECHA DE VENTA': string;
+  'TERMINAL': string;
+  'MONTO BRUTO': number;
+  'MONTO NETO': number;
+  'TOTAL RET.': number;
+  'RET IIBB': number;
+  'TOTAL COM.': number;
+  'COM. TOTAL': number;
+  'IVA COM.': number;
+  'PERCEP IVA': number;
+}
+
 export default function Home() {
   const router = useRouter();
   const [selectedType, setSelectedType] = useState<ProcessType | null>(null);
@@ -37,6 +52,15 @@ export default function Home() {
   const [extractosFiltroFechaDesde, setExtractosFiltroFechaDesde] = useState<string>('');
   const [extractosFiltroFechaHasta, setExtractosFiltroFechaHasta] = useState<string>('');
   const [isExportingExtractos, setIsExportingExtractos] = useState(false);
+
+  // Para Payway: dashboard con filtros
+  const [paywayRows, setPaywayRows] = useState<PaywayRow[]>([]);
+  const [paywayFiltroRazon, setPaywayFiltroRazon] = useState<string>('all');
+  const [paywayFiltroLocal, setPaywayFiltroLocal] = useState<string>('all');
+  const [paywayFiltroTerminal, setPaywayFiltroTerminal] = useState<string>('all');
+  const [paywayFiltroFechaDesde, setPaywayFiltroFechaDesde] = useState<string>('');
+  const [paywayFiltroFechaHasta, setPaywayFiltroFechaHasta] = useState<string>('');
+  const [isExportingPayway, setIsExportingPayway] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -329,6 +353,35 @@ export default function Home() {
         setFiles([]);
         setIsProcessing(false);
         return;
+      } else if (selectedType === 'payway') {
+        // Para Payway: el endpoint devuelve JSON con las transferencias
+        // y mostramos un dashboard con filtros, totales y tabla
+        const formData = new FormData();
+        files.forEach((file) => {
+          formData.append('files', file);
+        });
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Error processing files');
+        }
+
+        const data = await response.json();
+        setPaywayRows(data.rows || []);
+        setPaywayFiltroRazon('all');
+        setPaywayFiltroLocal('all');
+        setPaywayFiltroTerminal('all');
+        setPaywayFiltroFechaDesde('');
+        setPaywayFiltroFechaHasta('');
+        setProcessedCount(files.length);
+        setFiles([]);
+        setIsProcessing(false);
+        return;
       } else {
         // Para otros tipos o pocos archivos, enviar todo junto
         const formData = new FormData();
@@ -380,6 +433,12 @@ export default function Home() {
     setExtractosFiltroBanco('all');
     setExtractosFiltroFechaDesde('');
     setExtractosFiltroFechaHasta('');
+    setPaywayRows([]);
+    setPaywayFiltroRazon('all');
+    setPaywayFiltroLocal('all');
+    setPaywayFiltroTerminal('all');
+    setPaywayFiltroFechaDesde('');
+    setPaywayFiltroFechaHasta('');
   };
 
   // ===== Helpers para el dashboard de extractos =====
@@ -432,6 +491,101 @@ export default function Home() {
     setExtractosFiltroBanco('all');
     setExtractosFiltroFechaDesde('');
     setExtractosFiltroFechaHasta('');
+  };
+
+  // ===== Helpers para el dashboard de Payway =====
+
+  // Convierte "dd/mm/yyyy" a "yyyy-mm-dd"
+  const fechaPaywayToISO = (f: string): string => {
+    const m = f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return '';
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  };
+
+  const razonesPayway = useMemo(() => {
+    const set = new Set(paywayRows.map(r => r['RAZON SOCIAL']).filter(v => v && v !== '-'));
+    return Array.from(set).sort();
+  }, [paywayRows]);
+
+  const localesPayway = useMemo(() => {
+    const set = new Set(paywayRows.map(r => r['LOCAL']).filter(v => v && v !== '-'));
+    return Array.from(set).sort();
+  }, [paywayRows]);
+
+  const terminalesPayway = useMemo(() => {
+    const set = new Set(paywayRows.map(r => r['TERMINAL']).filter(Boolean));
+    return Array.from(set).sort();
+  }, [paywayRows]);
+
+  const paywayFiltrados = useMemo(() => {
+    return paywayRows.filter(r => {
+      if (paywayFiltroRazon !== 'all' && r['RAZON SOCIAL'] !== paywayFiltroRazon) return false;
+      if (paywayFiltroLocal !== 'all' && r['LOCAL'] !== paywayFiltroLocal) return false;
+      if (paywayFiltroTerminal !== 'all' && r['TERMINAL'] !== paywayFiltroTerminal) return false;
+      if (paywayFiltroFechaDesde || paywayFiltroFechaHasta) {
+        const iso = fechaPaywayToISO(r['FECHA DE VENTA']);
+        if (paywayFiltroFechaDesde && iso < paywayFiltroFechaDesde) return false;
+        if (paywayFiltroFechaHasta && iso > paywayFiltroFechaHasta) return false;
+      }
+      return true;
+    });
+  }, [paywayRows, paywayFiltroRazon, paywayFiltroLocal, paywayFiltroTerminal, paywayFiltroFechaDesde, paywayFiltroFechaHasta]);
+
+  const totalBrutoPayway = useMemo(
+    () => paywayFiltrados.reduce((acc, r) => acc + (Number(r['MONTO BRUTO']) || 0), 0),
+    [paywayFiltrados]
+  );
+  const totalRetPayway = useMemo(
+    () => paywayFiltrados.reduce((acc, r) => acc + (Number(r['TOTAL RET.']) || 0), 0),
+    [paywayFiltrados]
+  );
+  const totalComPayway = useMemo(
+    () => paywayFiltrados.reduce((acc, r) => acc + (Number(r['TOTAL COM.']) || 0), 0),
+    [paywayFiltrados]
+  );
+  const totalNetoPayway = useMemo(
+    () => paywayFiltrados.reduce((acc, r) => acc + (Number(r['MONTO NETO']) || 0), 0),
+    [paywayFiltrados]
+  );
+
+  const formatMoneyPayway = (n: number) =>
+    '$' + new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+  const limpiarFiltrosPayway = () => {
+    setPaywayFiltroRazon('all');
+    setPaywayFiltroLocal('all');
+    setPaywayFiltroTerminal('all');
+    setPaywayFiltroFechaDesde('');
+    setPaywayFiltroFechaHasta('');
+  };
+
+  const exportarPaywayExcel = async () => {
+    if (paywayFiltrados.length === 0) return;
+    setIsExportingPayway(true);
+    try {
+      const response = await fetch('/api/generate-payway-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: paywayFiltrados }),
+      });
+      if (!response.ok) {
+        throw new Error('Error generando Excel');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'payway_transferencias_consolidado.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error(e);
+      alert('Hubo un error al exportar el Excel.');
+    } finally {
+      setIsExportingPayway(false);
+    }
   };
 
   const exportarExtractosExcel = async () => {
@@ -850,7 +1004,193 @@ export default function Home() {
               </button>
             </div>
 
-            {selectedType === 'extractos' && extractosRows.length > 0 ? (
+            {selectedType === 'payway' && paywayRows.length > 0 ? (
+              /* Dashboard de transferencias Payway con totales, filtros y tabla */
+              <div className="space-y-6">
+                {/* Botones acción */}
+                <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={exportarPaywayExcel}
+                    disabled={isExportingPayway || paywayFiltrados.length === 0}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isExportingPayway ? (
+                      <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    )}
+                    Exportar Reporte
+                  </button>
+                  <button
+                    onClick={limpiarFiltrosPayway}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                    </svg>
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPaywayRows([]);
+                      limpiarFiltrosPayway();
+                    }}
+                    className="ml-auto inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Subir nuevos archivos →
+                  </button>
+                </div>
+
+                {/* Totales */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Bruto Total</p>
+                    <p className="text-2xl xl:text-3xl font-bold text-white font-mono">
+                      {formatMoneyPayway(totalBrutoPayway)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Total Retenciones</p>
+                    <p className="text-2xl xl:text-3xl font-bold text-red-400 font-mono">
+                      {formatMoneyPayway(totalRetPayway)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Total Comisiones</p>
+                    <p className="text-2xl xl:text-3xl font-bold text-orange-400 font-mono">
+                      {formatMoneyPayway(totalComPayway)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Neto Estimado</p>
+                    <p className="text-2xl xl:text-3xl font-bold text-purple-400 font-mono">
+                      {formatMoneyPayway(totalNetoPayway)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filtros */}
+                <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-gray-300 font-medium uppercase tracking-wider text-sm">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      Filtros
+                    </div>
+                    {razonesPayway.length > 0 && (
+                      <select
+                        value={paywayFiltroRazon}
+                        onChange={(e) => setPaywayFiltroRazon(e.target.value)}
+                        className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="all">Todas las Razones Sociales</option>
+                        {razonesPayway.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    )}
+                    {localesPayway.length > 0 && (
+                      <select
+                        value={paywayFiltroLocal}
+                        onChange={(e) => setPaywayFiltroLocal(e.target.value)}
+                        className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="all">Todos los Locales</option>
+                        {localesPayway.map(l => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </select>
+                    )}
+                    <select
+                      value={paywayFiltroTerminal}
+                      onChange={(e) => setPaywayFiltroTerminal(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="all">Todas las Terminales</option>
+                      {terminalesPayway.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={paywayFiltroFechaDesde}
+                      onChange={(e) => setPaywayFiltroFechaDesde(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      title="Desde"
+                    />
+                    <input
+                      type="date"
+                      value={paywayFiltroFechaHasta}
+                      onChange={(e) => setPaywayFiltroFechaHasta(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      title="Hasta"
+                    />
+                    <span className="ml-auto italic text-gray-400 text-sm">
+                      Viendo <strong className="text-white">{paywayFiltrados.length}</strong> de{' '}
+                      <strong className="text-white">{paywayRows.length}</strong> transferencias
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabla */}
+                <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden">
+                  <div className="overflow-auto max-h-[600px]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-800 sticky top-0 z-10">
+                        <tr className="text-gray-400 uppercase text-xs tracking-wider">
+                          <th className="text-left px-4 py-3">R. Social</th>
+                          <th className="text-left px-4 py-3">Local</th>
+                          <th className="text-left px-4 py-3">Fecha</th>
+                          <th className="text-left px-4 py-3">Terminal</th>
+                          <th className="text-right px-4 py-3">Bruto</th>
+                          <th className="text-right px-4 py-3">Neto</th>
+                          <th className="text-right px-4 py-3 text-red-400">Total Ret.</th>
+                          <th className="text-right px-4 py-3 text-red-400">Ret IIBB CABA</th>
+                          <th className="text-right px-4 py-3 text-orange-400">Total Com.</th>
+                          <th className="text-right px-4 py-3 text-orange-400">Com.</th>
+                          <th className="text-right px-4 py-3 text-orange-400">IVA</th>
+                          <th className="text-right px-4 py-3 text-orange-400">Percep IVA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paywayFiltrados.slice(0, 1000).map((row, idx) => (
+                          <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-800/40">
+                            <td className="px-4 py-3 text-gray-300">{row['RAZON SOCIAL']}</td>
+                            <td className="px-4 py-3 text-gray-300">{row['LOCAL']}</td>
+                            <td className="px-4 py-3 text-gray-300 font-mono">{row['FECHA DE VENTA']}</td>
+                            <td className="px-4 py-3 text-gray-300 font-mono">{row['TERMINAL']}</td>
+                            <td className="px-4 py-3 text-right text-white font-mono">{formatMoneyPayway(row['MONTO BRUTO'])}</td>
+                            <td className="px-4 py-3 text-right text-emerald-400 font-mono">{formatMoneyPayway(row['MONTO NETO'])}</td>
+                            <td className="px-4 py-3 text-right text-red-400 font-mono">{formatMoneyPayway(row['TOTAL RET.'])}</td>
+                            <td className="px-4 py-3 text-right text-red-400 font-mono">{formatMoneyPayway(row['RET IIBB'])}</td>
+                            <td className="px-4 py-3 text-right text-orange-400 font-mono">{formatMoneyPayway(row['TOTAL COM.'])}</td>
+                            <td className="px-4 py-3 text-right text-orange-400 font-mono">{formatMoneyPayway(row['COM. TOTAL'])}</td>
+                            <td className="px-4 py-3 text-right text-orange-400 font-mono">{formatMoneyPayway(row['IVA COM.'])}</td>
+                            <td className="px-4 py-3 text-right text-orange-400 font-mono">{formatMoneyPayway(row['PERCEP IVA'])}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {paywayFiltrados.length > 1000 && (
+                    <div className="px-4 py-3 text-center text-sm text-gray-400 bg-slate-800/50 border-t border-slate-700">
+                      Mostrando las primeras 1000 transferencias. El Excel exportado incluye las {paywayFiltrados.length} transferencias filtradas.
+                    </div>
+                  )}
+                  {paywayFiltrados.length === 0 && (
+                    <div className="px-4 py-12 text-center text-gray-400">
+                      No hay transferencias que coincidan con los filtros aplicados.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : selectedType === 'extractos' && extractosRows.length > 0 ? (
               /* Dashboard de extractos bancarios con totales, filtros y tabla */
               <div className="space-y-6">
                 {/* Botones acción */}

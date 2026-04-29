@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { processPaywayFiles, PaywayInputFile } from '@/lib/paywayProcessor';
-import { generatePaywayExcel } from '@/lib/paywayExcel';
 
 export const config = {
   api: {
@@ -57,11 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No se encontraron transferencias en los archivos' });
     }
 
-    const excelBuffer = await generatePaywayExcel(rows);
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=payway_transferencias_consolidado.xlsx');
-    res.send(excelBuffer);
+    res.status(200).json({ rows });
   } catch (error) {
     console.error('Error procesando transferencias Payway:', error);
     res.status(500).json({
