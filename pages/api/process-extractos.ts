@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { processExtractos, InputFile } from '@/lib/extractosBancariosProcessor';
-import { generateExtractosExcel } from '@/lib/extractosBancariosExcel';
 
 export const config = {
   api: {
@@ -57,11 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No se encontraron movimientos válidos en los archivos' });
     }
 
-    const excelBuffer = await generateExtractosExcel(rows);
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=extractos_bancarios_consolidado.xlsx');
-    res.send(excelBuffer);
+    res.status(200).json({ rows });
   } catch (error) {
     console.error('Error procesando extractos bancarios:', error);
     res.status(500).json({

@@ -1,9 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos' | 'payway';
+
+interface ExtractoRow {
+  'Razón Social': string;
+  'Banco': string;
+  'Fecha': string;
+  'Descripción': string;
+  'Débito': number;
+  'Crédito': number;
+  'Leyenda / Referencia': string;
+  'Saldo': number;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -18,6 +29,14 @@ export default function Home() {
   const [arcaConcilFile, setArcaConcilFile] = useState<File | null>(null);
   const [isDraggingOppen, setIsDraggingOppen] = useState(false);
   const [isDraggingArcaConcil, setIsDraggingArcaConcil] = useState(false);
+
+  // Para extractos bancarios: dashboard con filtros
+  const [extractosRows, setExtractosRows] = useState<ExtractoRow[]>([]);
+  const [extractosFiltroEmpresa, setExtractosFiltroEmpresa] = useState<string>('all');
+  const [extractosFiltroBanco, setExtractosFiltroBanco] = useState<string>('all');
+  const [extractosFiltroFechaDesde, setExtractosFiltroFechaDesde] = useState<string>('');
+  const [extractosFiltroFechaHasta, setExtractosFiltroFechaHasta] = useState<string>('');
+  const [isExportingExtractos, setIsExportingExtractos] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -282,6 +301,34 @@ export default function Home() {
         }, 3000);
         setIsProcessing(false);
         return;
+      } else if (selectedType === 'extractos') {
+        // Para extractos: el endpoint devuelve JSON con los movimientos
+        // y mostramos un dashboard con filtros, totales y tabla
+        const formData = new FormData();
+        files.forEach((file) => {
+          formData.append('files', file);
+        });
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Error processing files');
+        }
+
+        const data = await response.json();
+        setExtractosRows(data.rows || []);
+        setExtractosFiltroEmpresa('all');
+        setExtractosFiltroBanco('all');
+        setExtractosFiltroFechaDesde('');
+        setExtractosFiltroFechaHasta('');
+        setProcessedCount(files.length);
+        setFiles([]);
+        setIsProcessing(false);
+        return;
       } else {
         // Para otros tipos o pocos archivos, enviar todo junto
         const formData = new FormData();
@@ -328,6 +375,92 @@ export default function Home() {
     setProcessedCount(0);
     setOppenFile(null);
     setArcaConcilFile(null);
+    setExtractosRows([]);
+    setExtractosFiltroEmpresa('all');
+    setExtractosFiltroBanco('all');
+    setExtractosFiltroFechaDesde('');
+    setExtractosFiltroFechaHasta('');
+  };
+
+  // ===== Helpers para el dashboard de extractos =====
+
+  // Convierte "dd-mm-yyyy" a "yyyy-mm-dd" para comparar / inputs date
+  const fechaExtractoToISO = (f: string): string => {
+    const m = f.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (!m) return '';
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  };
+
+  const empresasExtractos = useMemo(() => {
+    const set = new Set(extractosRows.map(r => r['Razón Social']).filter(Boolean));
+    return Array.from(set).sort();
+  }, [extractosRows]);
+
+  const bancosExtractos = useMemo(() => {
+    const set = new Set(extractosRows.map(r => r['Banco']).filter(Boolean));
+    return Array.from(set).sort();
+  }, [extractosRows]);
+
+  const extractosFiltrados = useMemo(() => {
+    return extractosRows.filter(r => {
+      if (extractosFiltroEmpresa !== 'all' && r['Razón Social'] !== extractosFiltroEmpresa) return false;
+      if (extractosFiltroBanco !== 'all' && r['Banco'] !== extractosFiltroBanco) return false;
+      if (extractosFiltroFechaDesde || extractosFiltroFechaHasta) {
+        const iso = fechaExtractoToISO(r['Fecha']);
+        if (extractosFiltroFechaDesde && iso < extractosFiltroFechaDesde) return false;
+        if (extractosFiltroFechaHasta && iso > extractosFiltroFechaHasta) return false;
+      }
+      return true;
+    });
+  }, [extractosRows, extractosFiltroEmpresa, extractosFiltroBanco, extractosFiltroFechaDesde, extractosFiltroFechaHasta]);
+
+  const totalDebitosExtractos = useMemo(
+    () => extractosFiltrados.reduce((acc, r) => acc + (Number(r['Débito']) || 0), 0),
+    [extractosFiltrados]
+  );
+
+  const totalCreditosExtractos = useMemo(
+    () => extractosFiltrados.reduce((acc, r) => acc + (Number(r['Crédito']) || 0), 0),
+    [extractosFiltrados]
+  );
+
+  const formatMoney = (n: number) =>
+    new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+  const limpiarFiltrosExtractos = () => {
+    setExtractosFiltroEmpresa('all');
+    setExtractosFiltroBanco('all');
+    setExtractosFiltroFechaDesde('');
+    setExtractosFiltroFechaHasta('');
+  };
+
+  const exportarExtractosExcel = async () => {
+    if (extractosFiltrados.length === 0) return;
+    setIsExportingExtractos(true);
+    try {
+      const response = await fetch('/api/generate-extractos-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: extractosFiltrados }),
+      });
+      if (!response.ok) {
+        throw new Error('Error generando Excel');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'extractos_bancarios_consolidado.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error(e);
+      alert('Hubo un error al exportar el Excel.');
+    } finally {
+      setIsExportingExtractos(false);
+    }
   };
 
   return (
@@ -717,7 +850,165 @@ export default function Home() {
               </button>
             </div>
 
-            {selectedType === 'conciliacion' ? (
+            {selectedType === 'extractos' && extractosRows.length > 0 ? (
+              /* Dashboard de extractos bancarios con totales, filtros y tabla */
+              <div className="space-y-6">
+                {/* Botones acción */}
+                <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={exportarExtractosExcel}
+                    disabled={isExportingExtractos || extractosFiltrados.length === 0}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isExportingExtractos ? (
+                      <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    )}
+                    Exportar Reporte
+                  </button>
+                  <button
+                    onClick={limpiarFiltrosExtractos}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                    </svg>
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setExtractosRows([]);
+                      limpiarFiltrosExtractos();
+                    }}
+                    className="ml-auto inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Subir nuevos archivos →
+                  </button>
+                </div>
+
+                {/* Totales */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Total Débitos (-)</p>
+                    <p className="text-3xl md:text-4xl font-bold text-red-400 italic font-mono">
+                      {formatMoney(totalDebitosExtractos)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                    <p className="text-sm uppercase tracking-wider text-gray-400 mb-2">Total Créditos (+)</p>
+                    <p className="text-3xl md:text-4xl font-bold text-emerald-400 italic font-mono">
+                      {formatMoney(totalCreditosExtractos)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filtros */}
+                <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-gray-300 font-medium uppercase tracking-wider text-sm">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      Filtros
+                    </div>
+                    <select
+                      value={extractosFiltroEmpresa}
+                      onChange={(e) => setExtractosFiltroEmpresa(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="all">Todas las Empresas</option>
+                      {empresasExtractos.map(e => (
+                        <option key={e} value={e}>{e}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={extractosFiltroBanco}
+                      onChange={(e) => setExtractosFiltroBanco(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="all">Todos los Bancos</option>
+                      {bancosExtractos.map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={extractosFiltroFechaDesde}
+                      onChange={(e) => setExtractosFiltroFechaDesde(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      title="Desde"
+                    />
+                    <input
+                      type="date"
+                      value={extractosFiltroFechaHasta}
+                      onChange={(e) => setExtractosFiltroFechaHasta(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      title="Hasta"
+                    />
+                    <span className="ml-auto italic text-gray-400 text-sm">
+                      Viendo <strong className="text-white">{extractosFiltrados.length}</strong> de{' '}
+                      <strong className="text-white">{extractosRows.length}</strong> movimientos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabla */}
+                <div className="bg-slate-800/30 border border-slate-700 rounded-2xl overflow-hidden">
+                  <div className="overflow-auto max-h-[600px]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-800 sticky top-0 z-10">
+                        <tr className="text-gray-400 uppercase text-xs tracking-wider">
+                          <th className="text-left px-4 py-3">Razón Social</th>
+                          <th className="text-left px-4 py-3">Banco</th>
+                          <th className="text-left px-4 py-3">Fecha</th>
+                          <th className="text-left px-4 py-3">Descripción</th>
+                          <th className="text-left px-4 py-3">Leyenda / Referencia</th>
+                          <th className="text-right px-4 py-3">Débito</th>
+                          <th className="text-right px-4 py-3">Crédito</th>
+                          <th className="text-right px-4 py-3">Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {extractosFiltrados.slice(0, 1000).map((row, idx) => (
+                          <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-800/40">
+                            <td className="px-4 py-3 text-indigo-300 font-medium italic">{row['Razón Social']}</td>
+                            <td className="px-4 py-3 italic text-gray-300">{row['Banco']}</td>
+                            <td className="px-4 py-3 text-gray-300 font-mono">{row['Fecha']}</td>
+                            <td className="px-4 py-3 text-gray-200">{row['Descripción']}</td>
+                            <td className="px-4 py-3 text-gray-400">{row['Leyenda / Referencia']}</td>
+                            <td className="px-4 py-3 text-right text-red-400 font-mono">
+                              {row['Débito'] ? formatMoney(row['Débito']) : ''}
+                            </td>
+                            <td className="px-4 py-3 text-right text-emerald-400 font-mono">
+                              {row['Crédito'] ? formatMoney(row['Crédito']) : ''}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-300 font-mono">
+                              {formatMoney(row['Saldo'])}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {extractosFiltrados.length > 1000 && (
+                    <div className="px-4 py-3 text-center text-sm text-gray-400 bg-slate-800/50 border-t border-slate-700">
+                      Mostrando los primeros 1000 movimientos. El Excel exportado incluye los {extractosFiltrados.length} movimientos filtrados.
+                    </div>
+                  )}
+                  {extractosFiltrados.length === 0 && (
+                    <div className="px-4 py-12 text-center text-gray-400">
+                      No hay movimientos que coincidan con los filtros aplicados.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : selectedType === 'conciliacion' ? (
               /* Interfaz especial para conciliación: 2 zonas de subida */
               <div className="grid md:grid-cols-2 gap-6 mb-8">
                 {/* Zona Oppen */}
