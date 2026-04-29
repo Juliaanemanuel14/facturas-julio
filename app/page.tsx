@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos' | 'payway';
 
 export default function Home() {
   const router = useRouter();
@@ -62,6 +62,10 @@ export default function Home() {
         if (selectedType === 'extractos') {
           const lname = file.name.toLowerCase();
           return lname.endsWith('.csv') || lname.endsWith('.xls') || lname.endsWith('.xlsx');
+        }
+        if (selectedType === 'payway') {
+          const lname = file.name.toLowerCase();
+          return lname.endsWith('.xls') || lname.endsWith('.xlsx');
         }
         return file.type === 'application/pdf';
       }
@@ -133,6 +137,7 @@ export default function Home() {
                         selectedType === 'proveedores' ? '/api/process-proveedores' :
                         selectedType === 'conciliacion' ? '/api/conciliacion-fc' :
                         selectedType === 'extractos' ? '/api/process-extractos' :
+                        selectedType === 'payway' ? '/api/process-payway' :
                         '/api/process-arca';
     const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
                              selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
@@ -140,6 +145,7 @@ export default function Home() {
                              selectedType === 'proveedores' ? 'facturas_proveedores.xlsx' :
                              selectedType === 'conciliacion' ? 'Conciliacion_Final_Analizada.xlsx' :
                              selectedType === 'extractos' ? 'extractos_bancarios_consolidado.xlsx' :
+                             selectedType === 'payway' ? 'payway_transferencias_consolidado.xlsx' :
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
@@ -367,7 +373,7 @@ export default function Home() {
         </div>
 
         {!selectedType ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-7 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6">
             <button
               onClick={() => setSelectedType('facturas')}
               className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-primary"
@@ -626,12 +632,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('payway')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-fuchsia-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-fuchsia-400 to-pink-600 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Transferencias de Payway
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Consolida exports de Payway en un solo Excel
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Múltiples razones sociales</p>
+                  <p>✓ Filtra Aprobadas y Devueltas</p>
+                  <p>✓ Suma RET IIBB por jurisdicción</p>
+                  <p>✓ Mantiene formato Payway oficial</p>
+                  <p>✓ Acepta XLS y XLSX</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : selectedType === 'extractos' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : selectedType === 'extractos' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600' : selectedType === 'payway' ? 'bg-gradient-to-br from-fuchsia-400 to-pink-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -663,7 +706,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : selectedType === 'extractos' ? 'Extractos Bancarios' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : selectedType === 'extractos' ? 'Extractos Bancarios' : selectedType === 'payway' ? 'Transferencias de Payway' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -810,7 +853,7 @@ export default function Home() {
                     id="fileInput"
                     type="file"
                     multiple
-                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : selectedType === 'extractos' ? '.csv,.xls,.xlsx' : '.pdf'}
+                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : selectedType === 'extractos' ? '.csv,.xls,.xlsx' : selectedType === 'payway' ? '.xls,.xlsx' : '.pdf'}
                     onChange={handleFileInput}
                     className="hidden"
                   />
@@ -833,7 +876,7 @@ export default function Home() {
                     </div>
 
                     <h3 className="text-2xl font-semibold mb-2">
-                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : selectedType === 'extractos' ? 'CSV, XLS o XLSX de extractos' : 'PDF'} aquí
+                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : selectedType === 'extractos' ? 'CSV, XLS o XLSX de extractos' : selectedType === 'payway' ? 'XLS o XLSX de Payway' : 'PDF'} aquí
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-4">
                       o haz clic para seleccionarlos
