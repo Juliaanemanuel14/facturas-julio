@@ -5,8 +5,6 @@
  * del comprobante (emisor, cliente, número, fecha, totales).
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export interface BazarItem {
   descripcion: string | null;
   codigo: string | null;
@@ -80,20 +78,60 @@ Solo el JSON, sin texto antes ni despues.`;
 
 // Modelo fijo para bazar/vajillas: NO usar GEMINI_MODEL global porque
 // puede apuntar a otro modelo (ej. gemini-2.5-pro) que da 503 por demanda.
+// Los modelos "preview" solo están disponibles en v1beta del API REST,
+// y el SDK @google/generative-ai 0.1.3 instalado solo apunta a v1, así
+// que llamamos directo por fetch a la URL de v1beta.
 const BAZAR_MODEL = 'gemini-3-flash-preview';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-let geminiModelInstance: any = null;
-
-function getGeminiModel() {
-  if (!geminiModelInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY no configurada en variables de entorno');
-    }
-    const genAI = new GoogleGenerativeAI(apiKey);
-    geminiModelInstance = genAI.getGenerativeModel({ model: BAZAR_MODEL });
+async function callGeminiBazar(buffer: Buffer, mimeType: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY no configurada en variables de entorno');
   }
-  return geminiModelInstance;
+
+  const url = `${GEMINI_API_BASE}/models/${BAZAR_MODEL}:generateContent?key=${apiKey}`;
+
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: PROMPT },
+          {
+            inlineData: {
+              mimeType,
+              data: buffer.toString('base64'),
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    },
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini ${res.status} ${res.statusText}: ${errText.slice(0, 500)}`);
+  }
+
+  const json = await res.json();
+  const text = json?.candidates?.[0]?.content?.parts
+    ?.map((p: any) => p?.text || '')
+    .join('') || '';
+  if (!text) {
+    throw new Error('Respuesta vacía de Gemini');
+  }
+  return text;
 }
 
 function cleanJsonResponse(text: string): string {
@@ -155,20 +193,12 @@ export async function processBazarInvoice(
       return { ...baseRow, error: `Tipo de archivo no soportado: ${mimeType}` };
     }
 
-    const model = getGeminiModel();
-    const filePart = {
-      inlineData: {
-        data: buffer.toString('base64'),
-        mimeType,
-      },
-    };
-
     // Reintentos con backoff para 503 / 429 (sobrecarga transitoria del modelo)
-    let response: any;
+    let rawText = '';
     let lastErr: any;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        response = await model.generateContent([PROMPT, filePart]);
+        rawText = await callGeminiBazar(buffer, mimeType);
         break;
       } catch (err: any) {
         lastErr = err;
@@ -181,8 +211,8 @@ export async function processBazarInvoice(
         await new Promise(r => setTimeout(r, attempt * 1500));
       }
     }
-    if (!response) throw lastErr;
-    const responseText = cleanJsonResponse(response.response.text());
+    if (!rawText) throw lastErr || new Error('Sin respuesta de Gemini');
+    const responseText = cleanJsonResponse(rawText);
     const parsed = pickPrincipalIfList(JSON.parse(responseText));
 
     if (!parsed || typeof parsed !== 'object') {
