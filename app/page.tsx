@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos' | 'payway';
+type ProcessType = 'facturas' | 'liquidaciones' | 'arca' | 'proveedores' | 'ddjj' | 'conciliacion' | 'extractos' | 'payway' | 'bazar';
 
 interface ExtractoRow {
   'Razón Social': string;
@@ -110,6 +110,9 @@ export default function Home() {
           const lname = file.name.toLowerCase();
           return lname.endsWith('.xls') || lname.endsWith('.xlsx');
         }
+        if (selectedType === 'bazar') {
+          return file.type === 'application/pdf' || file.type.startsWith('image/');
+        }
         return file.type === 'application/pdf';
       }
     );
@@ -181,6 +184,7 @@ export default function Home() {
                         selectedType === 'conciliacion' ? '/api/conciliacion-fc' :
                         selectedType === 'extractos' ? '/api/process-extractos' :
                         selectedType === 'payway' ? '/api/process-payway' :
+                        selectedType === 'bazar' ? '/api/process-bazar' :
                         '/api/process-arca';
     const downloadFilename = selectedType === 'facturas' ? 'facturas_procesadas.xlsx' :
                              selectedType === 'liquidaciones' ? 'liquidaciones_tarjetas.xlsx' :
@@ -189,6 +193,7 @@ export default function Home() {
                              selectedType === 'conciliacion' ? 'Conciliacion_Final_Analizada.xlsx' :
                              selectedType === 'extractos' ? 'extractos_bancarios_consolidado.xlsx' :
                              selectedType === 'payway' ? 'payway_transferencias_consolidado.xlsx' :
+                             selectedType === 'bazar' ? 'facturas_bazar_vajillas.xlsx' :
                              'comprobantes_arca_consolidados.xlsx';
 
     try {
@@ -274,6 +279,55 @@ export default function Home() {
 
         // Generar Excel con todos los resultados
         const excelResponse = await fetch('/api/generate-proveedores-excel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoices: allResults }),
+        });
+
+        if (!excelResponse.ok) {
+          throw new Error('Error generando Excel');
+        }
+
+        const blob = await excelResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+      // Para bazar y vajillas, procesar en lotes de 3 archivos para evitar error 413
+      else if (selectedType === 'bazar' && files.length > 3) {
+        const BATCH_SIZE = 3;
+        const allResults: any[] = [];
+
+        for (let i = 0; i < files.length; i += BATCH_SIZE) {
+          const batch = files.slice(i, i + BATCH_SIZE);
+          const formData = new FormData();
+          batch.forEach((file) => {
+            formData.append('files', file);
+          });
+
+          const response = await fetch('/api/analyze-bazar', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error en lote ${Math.floor(i / BATCH_SIZE) + 1}`);
+          }
+
+          const data = await response.json();
+          if (data.invoices) {
+            allResults.push(...data.invoices);
+          }
+
+          setProcessedCount(Math.min(i + BATCH_SIZE, files.length));
+        }
+
+        const excelResponse = await fetch('/api/generate-bazar-excel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ invoices: allResults }),
@@ -956,12 +1010,49 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setSelectedType('bazar')}
+              className="group relative p-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-amber-700"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-700/10 to-yellow-600/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-600 to-yellow-700 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+                  Extracción Bazar y Vajillas
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Desglosa facturas de bazar/vajillas con IA (Gemini)
+                </p>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>✓ Razón social emisor y cliente</p>
+                  <p>✓ Tipo de comprobante (A/B/C, NC, ND)</p>
+                  <p>✓ Número, fecha, neto, IVA y total</p>
+                  <p>✓ Procesamiento por lotes</p>
+                  <p>✓ Soporta PDF e imágenes</p>
+                </div>
+              </div>
+            </button>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : selectedType === 'extractos' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600' : selectedType === 'payway' ? 'bg-gradient-to-br from-fuchsia-400 to-pink-600' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-full ${selectedType === 'facturas' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : selectedType === 'liquidaciones' ? 'bg-gradient-to-br from-purple-400 to-purple-600' : selectedType === 'proveedores' ? 'bg-gradient-to-br from-orange-400 to-amber-600' : selectedType === 'ddjj' ? 'bg-gradient-to-br from-pink-400 to-rose-600' : selectedType === 'conciliacion' ? 'bg-gradient-to-br from-cyan-400 to-teal-600' : selectedType === 'extractos' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600' : selectedType === 'payway' ? 'bg-gradient-to-br from-fuchsia-400 to-pink-600' : selectedType === 'bazar' ? 'bg-gradient-to-br from-amber-600 to-yellow-700' : 'bg-gradient-to-br from-green-400 to-emerald-600'} flex items-center justify-center`}>
                   <svg
                     className="w-5 h-5 text-white"
                     fill="none"
@@ -993,7 +1084,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : selectedType === 'extractos' ? 'Extractos Bancarios' : selectedType === 'payway' ? 'Transferencias de Payway' : 'Bot ARCA'}
+                  {selectedType === 'facturas' ? 'Desglose Facturas Arca' : selectedType === 'liquidaciones' ? 'Liquidaciones de Tarjetas' : selectedType === 'proveedores' ? 'Desglose Facturas Proveedores' : selectedType === 'ddjj' ? 'Extractor Declaración Jurada' : selectedType === 'conciliacion' ? 'Conciliación FC Compra' : selectedType === 'extractos' ? 'Extractos Bancarios' : selectedType === 'payway' ? 'Transferencias de Payway' : selectedType === 'bazar' ? 'Extracción Bazar y Vajillas' : 'Bot ARCA'}
                 </h2>
               </div>
               <button
@@ -1484,7 +1575,7 @@ export default function Home() {
                     id="fileInput"
                     type="file"
                     multiple
-                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : selectedType === 'extractos' ? '.csv,.xls,.xlsx' : selectedType === 'payway' ? '.xls,.xlsx' : '.pdf'}
+                    accept={selectedType === 'arca' ? '.csv' : selectedType === 'proveedores' ? '.pdf,image/*' : selectedType === 'liquidaciones' ? '.pdf,.zip' : selectedType === 'extractos' ? '.csv,.xls,.xlsx' : selectedType === 'payway' ? '.xls,.xlsx' : selectedType === 'bazar' ? '.pdf,image/*' : '.pdf'}
                     onChange={handleFileInput}
                     className="hidden"
                   />
@@ -1507,7 +1598,7 @@ export default function Home() {
                     </div>
 
                     <h3 className="text-2xl font-semibold mb-2">
-                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : selectedType === 'extractos' ? 'CSV, XLS o XLSX de extractos' : selectedType === 'payway' ? 'XLS o XLSX de Payway' : 'PDF'} aquí
+                      Arrastra tus archivos {selectedType === 'arca' ? 'CSV' : selectedType === 'proveedores' ? 'PDF o imágenes' : selectedType === 'ddjj' ? 'PDF de DDJJ IVA' : selectedType === 'liquidaciones' ? 'PDF o ZIP con PDFs' : selectedType === 'extractos' ? 'CSV, XLS o XLSX de extractos' : selectedType === 'payway' ? 'XLS o XLSX de Payway' : selectedType === 'bazar' ? 'PDF o imágenes de facturas' : 'PDF'} aquí
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-4">
                       o haz clic para seleccionarlos
